@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ledger — Payroll Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F5F4;
+    --surface:#FFFFFF;
+    --ink:#222222;
+    --ink-soft:#6B6B6B;
+    --ink-faint:#9A9A9A;
+    --border:#E1E1DF;
+    --accent:#3D3D3D;
+    --accent-ink:#1C1C1C;
+    --accent-soft:#ECECEA;
+    --danger:#AE4038;
+    --danger-soft:#F6E7E5;
+    --warn:#8A6D1E;
+    --warn-soft:#F5EEDC;
+    --c-blue:#3B6E91; --c-blue-soft:#E9F1F6;
+    --c-green:#3F7D58; --c-green-soft:#E9F4EE;
+    --c-amber:#B9822E; --c-amber-soft:#F8EFDF;
+    --c-plum:#7C4A76; --c-plum-soft:#F4E9F2;
+    --radius:6px;
+    --shadow:none;
+    font-family:"Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--ink);}
+  body{font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:"Poppins",sans-serif;margin:0;font-weight:600;color:var(--ink);}
+  button{font-family:inherit;font-size:14px;cursor:pointer;}
+  input,select{font-family:inherit;font-size:14px;}
+  a{color:inherit;}
+  .tabular{font-variant-numeric:tabular-nums;}
+  ::selection{background:var(--accent-soft);}
+
+  /* ---------- Login ---------- */
+  #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .login-card{width:100%;max-width:380px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:36px 32px;}
+  .brand{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}
+  .brand .mark{width:10px;height:10px;background:var(--accent);border-radius:2px;display:inline-block;transform:translateY(-1px);}
+  .brand h1{font-size:24px;}
+  .login-card p.sub{color:var(--ink-soft);margin:2px 0 28px 0;font-size:13px;}
+  .field{margin-bottom:16px;}
+  .field label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:6px;}
+  .field input,.field select,.field textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--ink);}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--radius);border:1px solid transparent;font-weight:600;font-size:13.5px;transition:background .12s ease;}
+  .btn-primary{background:var(--accent);color:#fff;}
+  .btn-primary:hover{background:var(--accent-ink);}
+  .btn-primary:focus-visible{outline:2px solid var(--accent-ink);outline-offset:2px;}
+  .btn-block{width:100%;}
+  .btn-secondary{background:var(--surface);border:1px solid var(--border);color:var(--ink);}
+  .btn-secondary:hover{background:var(--bg);}
+  .btn-danger{background:var(--danger);color:#fff;}
+  .btn-danger:hover{background:#8f322c;}
+  .btn-ghost{background:transparent;border:1px solid transparent;color:var(--ink-soft);padding:6px 10px;}
+  .btn-ghost:hover{background:var(--bg);color:var(--ink);}
+  .btn-sm{padding:5px 10px;font-size:12.5px;}
+  .login-error{background:var(--danger-soft);color:var(--danger);border-radius:var(--radius);padding:9px 12px;font-size:13px;margin-bottom:16px;}
+  .demo-hint{margin-top:24px;padding-top:18px;border-top:1px solid var(--border);font-size:12px;color:var(--ink-faint);}
+  .demo-hint code{background:var(--bg);padding:1px 5px;border-radius:4px;}
+  .password-wrap{position:relative;}
+  .password-wrap input{padding-right:44px;}
+  .toggle-pw{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--ink-soft);cursor:pointer;padding:6px;border-radius:4px;display:flex;align-items:center;justify-content:center;}
+  .toggle-pw:hover{background:var(--bg);color:var(--ink);}
+  .toggle-pw svg{width:18px;height:18px;display:block;}
+  .forgot-link-row{text-align:center;margin-top:14px;}
+  .forgot-link-row a{font-size:12.5px;color:var(--ink-soft);text-decoration:underline;}
+  .forgot-link-row a:hover{color:var(--ink);}
+  .forgot-note{display:none;margin-top:12px;font-size:12.5px;color:var(--ink-soft);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;text-align:center;}
+  .forgot-note.show{display:block;}
+  .print-row{display:flex;justify-content:flex-end;margin-top:12px;}
+
+  /* ---------- Shell ---------- */
+  #app-shell{display:flex;min-height:100vh;}
+  .sidebar{width:220px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;bottom:0;left:0;transition:transform .18s ease;z-index:40;}
+  .sidebar-head{padding:22px 20px 18px 20px;border-bottom:1px solid var(--border);}
+  .sidebar-head .brand h1{font-size:19px;}
+  .sidebar-head .role-pill{display:inline-block;margin-top:8px;font-size:11px;letter-spacing:.02em;color:var(--accent-ink);background:var(--accent-soft);padding:2px 8px;border-radius:10px;}
+  nav.nav-list{padding:14px 10px;flex:1;overflow-y:auto;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:var(--radius);color:var(--ink-soft);font-size:13.5px;font-weight:500;margin-bottom:2px;}
+  .nav-item:hover{background:var(--bg);color:var(--ink);}
+  .nav-item.active{background:var(--accent-soft);color:var(--accent-ink);}
+  .nav-item .dot{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55;flex-shrink:0;}
+  .sidebar-foot{padding:14px 16px;border-top:1px solid var(--border);}
+  .user-chip{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+  .user-chip .name{font-size:13px;font-weight:600;line-height:1.2;}
+  .user-chip .sub{font-size:11.5px;color:var(--ink-faint);}
+
+  .main{margin-left:220px;flex:1;min-width:0;display:flex;flex-direction:column;}
+  .topbar{display:none;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30;}
+  .hamburger{width:36px;height:36px;border-radius:var(--radius);border:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;}
+  .hamburger span{width:16px;height:2px;background:var(--ink);display:block;}
+  .content{padding:26px 32px 60px 32px;max-width:1080px;width:100%;}
+  .page-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:22px;}
+  .page-head h2{font-size:22px;}
+  .page-head p{color:var(--ink-soft);margin:4px 0 0 0;font-size:13px;}
+  .overlay{position:fixed;inset:0;background:rgba(20,26,20,.35);z-index:35;display:none;}
+  .overlay.show{display:block;}
+
+  /* ---------- Cards / stats ---------- */
+  .stat-grid{margin-bottom:28px;}
+  .ledger-strip{display:flex;flex-wrap:wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);}
+  .ledger-stat{flex:1 1 200px;padding:20px 26px;position:relative;border-left:1px solid var(--border);}
+  .ledger-stat:first-child{border-left:none;}
+  .ledger-stat.clickable{cursor:pointer;transition:background .12s ease;}
+  .ledger-stat.clickable:hover{background:var(--bg);}
+  .ledger-label{font-size:12.5px;color:var(--ink-soft);margin-bottom:10px;}
+  .ledger-figure{font-family:"Source Serif 4",Georgia,serif;font-size:29px;font-weight:600;letter-spacing:-.01em;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1;}
+  .ledger-sub{font-size:12px;color:var(--ink-faint);margin-top:8px;}
+  .ledger-delta{font-size:12px;margin-top:8px;font-weight:600;}
+  .ledger-delta.up{color:var(--c-green);}
+  .ledger-delta.down{color:var(--danger);}
+  @media (max-width:640px){
+    .ledger-stat{flex:1 1 100%;border-left:none !important;}
+    .ledger-stat:not(:first-child){border-top:1px solid var(--border);margin-top:0;}
+  }
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 22px;margin-bottom:20px;}
+  .panel h3{font-size:15px;margin-bottom:14px;}
+
+  /* ---------- Tables ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;font-size:11.5px;color:var(--ink-soft);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
+  td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .table-wrap{overflow-x:auto;}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;}
+  .status-pill{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;display:inline-block;}
+  .status-active{background:var(--accent-soft);color:var(--accent-ink);}
+  .status-leave{background:var(--warn-soft);color:var(--warn);}
+  .status-inactive{background:var(--danger-soft);color:var(--danger);}
+  .empty-state{padding:40px 20px;text-align:center;color:var(--ink-faint);}
+  tr[data-view-pr], tr.clickable-row{cursor:pointer;}
+  tr[data-view-pr]:hover, tr.clickable-row:hover{background:var(--bg);}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;justify-content:space-between;}
+  .toolbar .filters{display:flex;gap:10px;flex-wrap:wrap;}
+  .toolbar input[type=text],.toolbar select{padding:8px 11px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);min-width:150px;}
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop{position:fixed;inset:0;background:rgba(20,26,20,.4);display:none;align-items:center;justify-content:center;z-index:60;padding:20px;}
+  .modal-backdrop.show{display:flex;}
+  .modal{background:var(--surface);border-radius:var(--radius);width:100%;max-width:480px;max-height:90vh;overflow-y:auto;border:1px solid var(--border);}
+  .modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);}
+  .modal-head h3{font-size:16px;}
+  .modal-close{background:none;border:none;font-size:18px;color:var(--ink-soft);line-height:1;padding:4px;}
+  .modal-body{padding:20px 22px;}
+  .modal-foot{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .form-grid .span-2{grid-column:1/-1;}
+  .calc-preview{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-top:4px;}
+  .calc-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;color:var(--ink-soft);}
+  .calc-row.total{border-top:1px solid var(--border);margin-top:6px;padding-top:9px;font-weight:700;color:var(--ink);font-size:15px;}
+
+  /* ---------- Toast ---------- */
+  #toast-wrap{position:fixed;bottom:20px;right:20px;z-index:80;display:flex;flex-direction:column;gap:8px;}
+  .toast{padding:12px 16px;border-radius:var(--radius);font-size:13.5px;font-weight:500;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:220px;}
+  .toast-success{background:var(--accent-ink);color:#fff;}
+  .toast-error{background:var(--danger);color:#fff;}
+
+  .payslip{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .payslip-head{background:var(--bg);padding:14px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);}
+  .payslip-row{display:flex;justify-content:space-between;padding:9px 18px;border-bottom:1px solid var(--border);font-size:13.5px;}
+  .payslip-row:last-child{border-bottom:none;}
+  .payslip-row.net{background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:15px;}
+
+  @media (max-width: 860px){
+    .sidebar{transform:translateX(-100%);}
+    .sidebar.open{transform:translateX(0);}
+    .main{margin-left:0;}
+    .topbar{display:flex;}
+    .content{padding:20px 16px 50px 16px;}
+    .form-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div id="toast-wrap"></div>
+
+<script>
+/* ============================================================
+   DATA LAYER
+============================================================ */
+const STORAGE_KEY = "ledgerPayrollDB_v4";
+
+function defaultSettings(){
+  return {
+    companyName: "Ledger Philippines Inc.",
+    companyAddress: "8th Floor, Ayala Tower One, Ayala Avenue, Makati City, Metro Manila",
+    dailyWorkingHours: 8,
+    workingDaysPerYear: 261,       // used to derive daily rate from monthly salary
+    otMultiplier: 1.25,            // 125% of hourly rate
+    nsdRate: 0.10,                 // 10% additional pay
+    payrollCutoff: "1st–15th and 16th–end of month",
+    payDate: "Every 15th and last working day of the month",
+    sss: { floorComp:5000, ceilingComp:35000, increment:500, eeRate:0.05, erRate:0.10 },
+    philhealth: { rate:0.05, eeShare:0.5, floor:10000, ceiling:100000 },
+    pagibig: { thresholdComp:1500, eeRateBelow:0.01, eeRateAbove:0.02, erRate:0.02, compCeiling:10000 },
+    bir: { table: [
+      {min:0,       max:20833,  base:0,        rate:0.00},
+      {min:20833,   max:33333,  base:0,        rate:0.15},
+      {min:33333,   max:66667,  base:1875,     rate:0.20},
+      {min:66667,   max:166667, base:8541.80,  rate:0.25},
+      {min:166667,  max:666667, base:33541.80, rate:0.30},
+      {min:666667,  max:null,   base:183541.80,rate:0.35}
+    ]}
+  };
+}
+
+function seedData(){
+  const employees = [
+    {id:"EMP001", fullName:"Juan Dela Cruz", position:"Software Developer", department:"Information Technology", employmentStatus:"Regular", basicSalary:35000, status:"Active", email:"juan.delacruz@ledgerco.com", username:"juan.delacruz", password:"Employee123"},
+    {id:"EMP002", fullName:"Maria Santos", position:"HR Officer", department:"Human Resources", employmentStatus:"Regular", basicSalary:28000, status:"Active", email:"maria.santos@ledgerco.com", username:"maria.santos", password:"Employee123"},
+    {id:"EMP003", fullName:"Pedro Reyes", position:"Accountant", department:"Finance", employmentStatus:"Regular", basicSalary:32000, status:"Active", email:"pedro.reyes@ledgerco.com", username:"pedro.reyes", password:"Employee123"},
+    {id:"EMP004", fullName:"Ana Lopez", position:"Marketing Specialist", department:"Marketing", employmentStatus:"Probationary", basicSalary:27000, status:"Active", email:"ana.lopez@ledgerco.com", username:"ana.lopez", password:"Employee123"},
+    {id:"EMP005", fullName:"Carlo Mendoza", position:"Network Administrator", department:"Information Technology", employmentStatus:"Regular", basicSalary:34000, status:"On Leave", email:"carlo.mendoza@ledgerco.com", username:"carlo.mendoza", password:"Employee123"},
+    {id:"EMP006", fullName:"Liza Fernandez", position:"Customer Support Rep.", department:"Operations", employmentStatus:"Regular", basicSalary:24000, status:"Active", email:"liza.fernandez@ledgerco.com", username:"liza.fernandez", password:"Employee123"}
+  ];
+
+  const settings = defaultSettings();
+  // Six consecutive 14-day cutoffs spanning July–September 2026 — every employee is paid bi-weekly.
+  const biweeklyPeriods = [
+    "2026-07-01_2026-07-14","2026-07-15_2026-07-28",
+    "2026-08-01_2026-08-14","2026-08-15_2026-08-28",
+    "2026-09-01_2026-09-14","2026-09-15_2026-09-28"
+  ];
+  const payrolls = [];
+  let pid = 1;
+
+  function makeInputs(idx, pIdx){
+    // Figures are sized for a 14-day cutoff (half of a full month's hours/allowances).
+    return {
+      regularHoursWorked: Math.round(settings.dailyWorkingHours * 11 / 2),
+      otHours: Math.round(([5, 2, 8][pIdx % 3] + (idx % 3)) / 2),
+      nsdHours: Math.round([10, 0, 20][pIdx % 3] / 2),
+      allowances: Math.round((1500 + (idx*100)%600) / 2),
+      holidayPay: pIdx % 3 === 2 ? 600 : 0,
+      bonuses: 0,
+      incentives: (idx===0 && pIdx===biweeklyPeriods.length-1) ? 1000 : 0,
+      otherEarnings: 0,
+      salaryLoan: (idx===2 && pIdx % 3 === 0) ? 500 : 0,
+      cashAdvance: 0,
+      absences: 0,
+      tardiness: (idx===4 && pIdx % 3 === 1) ? 75 : 0,
+      undertime: 0,
+      companyLoan: 0,
+      otherDeductions: 0
+    };
+  }
+
+  employees.forEach((emp, idx) => {
+    biweeklyPeriods.forEach((period, pIdx) => {
+      const rec = computePayrollRecord(emp, period, makeInputs(idx, pIdx), settings, "biweekly");
+      rec.id = "PR" + String(pid++).padStart(4,"0");
+      payrolls.push(rec);
+    });
+  });
+
+  return {
+    admin: {username:"admin", password:"Admin123", fullName:"System Administrator"},
+    employees,
+    payrolls,
+    settings
+  };
+}
+
+/* ============================================================
+   PHILIPPINE PAYROLL CALCULATION ENGINE
+============================================================ */
+function round2(n){ return Math.round((Number(n)||0) * 100) / 100; }
+
+function computeSSS(basicMonthly, settings){
+  const s = settings.sss;
+  const comp = Math.max(s.floorComp, Math.min(basicMonthly, s.ceilingComp));
+  let msc = Math.ceil(comp / s.increment) * s.increment;
+  msc = Math.max(s.floorComp, Math.min(msc, s.ceilingComp));
+  const ee = round2(msc * s.eeRate);
+  const er = round2(msc * s.erRate);
+  return {msc, eeRate:s.eeRate, erRate:s.erRate, ee, er, total: round2(ee+er)};
+}
+
+function computePhilHealth(basicMonthly, settings){
+  const p = settings.philhealth;
+  const base = Math.max(p.floor, Math.min(basicMonthly, p.ceiling));
+  const total = round2(base * p.rate);
+  const ee = round2(total * p.eeShare);
+  const er = round2(total - ee);
+  return {base, rate:p.rate, eeShare:p.eeShare, ee, er, total};
+}
+
+function computePagIbig(basicMonthly, settings){
+  const g = settings.pagibig;
+  const base = Math.min(basicMonthly, g.compCeiling);
+  const eeRate = basicMonthly <= g.thresholdComp ? g.eeRateBelow : g.eeRateAbove;
+  const ee = round2(base * eeRate);
+  const er = round2(base * g.erRate);
+  return {base, eeRate, erRate:g.erRate, ee, er, total: round2(ee+er)};
+}
+
+function computeWithholdingTax(taxableMonthly, settings){
+  const table = settings.bir.table;
+  const t = Math.max(0, taxableMonthly);
+  const row = table.find(r => t > r.min && (r.max===null || t <= r.max)) || table[0];
+  const tax = row.base + (t - row.min) * row.rate;
+  return {taxable: t, bracket: row, amount: Math.max(0, round2(tax))};
+}
+
+function scaleContribution(c, factor){
+  return { ...c, ee: round2(c.ee*factor), er: round2(c.er*factor), total: round2(c.total*factor) };
+}
+
+function computePayrollRecord(emp, period, inputs, settings, payFrequency){
+  inputs = inputs || {};
+  const frequency = payFrequency || inferFrequencyFromPeriod(period);
+  const isBiweekly = frequency === "biweekly";
+
+  const monthlySalary = Number(emp.basicSalary)||0;
+  const dailyRate = round2((monthlySalary * 12) / settings.workingDaysPerYear);
+  const hourlyRate = round2(dailyRate / settings.dailyWorkingHours);
+
+  const regularHoursWorked = Number(inputs.regularHoursWorked)||0;
+  const otHours = Number(inputs.otHours)||0;
+  const nsdHours = Number(inputs.nsdHours)||0;
+  const otMultiplier = settings.otMultiplier;
+  const nsdRate = settings.nsdRate;
+  const otPay = round2(hourlyRate * otHours * otMultiplier);
+  const nsdPay = round2(hourlyRate * nsdHours * nsdRate);
+
+  const allowances = Number(inputs.allowances)||0;
+  const holidayPay = Number(inputs.holidayPay)||0;
+  const bonuses = Number(inputs.bonuses)||0;
+  const incentives = Number(inputs.incentives)||0;
+  const otherEarnings = Number(inputs.otherEarnings)||0;
+
+  // Basic pay for the period: half the monthly salary for a bi-weekly cutoff, full monthly salary otherwise.
+  const basicPay = isBiweekly ? round2(monthlySalary / 2) : monthlySalary;
+  const grossPay = round2(basicPay + otPay + nsdPay + holidayPay + allowances + bonuses + incentives + otherEarnings);
+
+  // Statutory contribution tables (SSS/PhilHealth/Pag-IBIG) are defined on MONTHLY compensation,
+  // so always compute the full monthly contribution first, then split it in half for a bi-weekly cutoff.
+  const splitFactor = isBiweekly ? 0.5 : 1;
+  const sssMonthly = computeSSS(monthlySalary, settings);
+  const philhealthMonthly = computePhilHealth(monthlySalary, settings);
+  const pagibigMonthly = computePagIbig(monthlySalary, settings);
+  const sss = scaleContribution(sssMonthly, splitFactor);
+  const philhealth = scaleContribution(philhealthMonthly, splitFactor);
+  const pagibig = scaleContribution(pagibigMonthly, splitFactor);
+
+  // Withholding tax: bring this period's gross up to a monthly-equivalent figure, tax it against the
+  // monthly BIR table, then bring the resulting tax back down to a per-period amount.
+  const monthlyEquivGross = isBiweekly ? round2(grossPay * 2) : grossPay;
+  const taxableIncome = Math.max(0, monthlyEquivGross - sssMonthly.ee - philhealthMonthly.ee - pagibigMonthly.ee);
+  const withholdingMonthly = computeWithholdingTax(taxableIncome, settings);
+  const withholdingTax = { ...withholdingMonthly, amount: isBiweekly ? round2(withholdingMonthly.amount/2) : withholdingMonthly.amount };
+
+  const salaryLoan = Number(inputs.salaryLoan)||0;
+  const cashAdvance = Number(inputs.cashAdvance)||0;
+  const absences = Number(inputs.absences)||0;
+  const tardiness = Number(inputs.tardiness)||0;
+  const undertime = Number(inputs.undertime)||0;
+  const companyLoan = Number(inputs.companyLoan)||0;
+  const otherDeductions = Number(inputs.otherDeductions)||0;
+  const otherDeductTotal = round2(salaryLoan+cashAdvance+absences+tardiness+undertime+companyLoan+otherDeductions);
+
+  const totalDeductions = round2(sss.ee + philhealth.ee + pagibig.ee + withholdingTax.amount + otherDeductTotal);
+  const netPay = round2(grossPay - totalDeductions);
+
+  return {
+    employeeId: emp.id, period, payFrequency: frequency,
+    dailyRate, hourlyRate,
+    regularHoursWorked, otHours, otMultiplier, otPay,
+    nsdHours, nsdRate, nsdPay,
+    basicSalary: basicPay, allowances, holidayPay, bonuses, incentives, otherEarnings,
+    gross: grossPay,
+    sss, philhealth, pagibig, withholdingTax,
+    salaryLoan, cashAdvance, absences, tardiness, undertime, companyLoan, otherDeductions, otherDeductTotal,
+    overtime: otPay, // legacy alias used by list views
+    deductions: totalDeductions, // legacy alias used by list views
+    totalDeductions,
+    net: netPay
+  };
+}
+
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(!parsed.settings) parsed.settings = defaultSettings();
+      return parsed;
+    }
+  }catch(e){}
+  const fresh = seedData();
+  saveDB(fresh);
+  return fresh;
+}
+function saveDB(db){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(db)); }catch(e){}
+}
+
+let db = loadDB();
+
+/* ============================================================
+   APP STATE
+============================================================ */
+const state = {
+  currentUser: null,     // {role:'admin'|'employee', ...}
+  view: "login",
+  sidebarOpen: false,
+  loginError: "",
+  employeeSearch: "",
+  historyFilterEmp: "",
+  historyFilterPeriod: "",
+  editingEmployeeId: null,
+  editingPayrollId: null
+};
+
+function money(n){
+  n = Number(n)||0;
+  return "₱" + n.toLocaleString("en-PH", {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+const ICON_EYE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5 5 12 5s10.5 7 10.5 7-3.5 7-10.5 7S1.5 12 1.5 12Z"/><circle cx="12" cy="12" r="3.2"/></svg>`;
+const ICON_EYE_OFF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c7 0 10.5 7 10.5 7a13.3 13.3 0 0 1-3.1 3.9M6.5 6.6C3.4 8.5 1.5 12 1.5 12s3.5 7 10.5 7c1.4 0 2.7-.28 3.9-.77"/><path d="M9.5 9.6a3.2 3.2 0 0 0 4.5 4.5"/></svg>`;
+
+function initials(name){
+  return name.split(" ").map(p=>p[0]).slice(0,2).join("").toUpperCase();
+}
+/* ---------------- PAY PERIOD HELPERS (monthly + bi-weekly) ---------------- */
+// Monthly periods are stored as "YYYY-MM" (e.g. "2026-09").
+// Bi-weekly periods are stored as "YYYY-MM-DD_YYYY-MM-DD" — a 14-day cutoff (e.g. "2026-09-01_2026-09-14").
+function isBiweeklyPeriod(p){ return typeof p === "string" && p.indexOf("_") !== -1; }
+function inferFrequencyFromPeriod(p){ return isBiweeklyPeriod(p) ? "biweekly" : "monthly"; }
+function parseISODate(s){
+  const [y,m,d] = s.split("-").map(Number);
+  return new Date(y, (m||1)-1, d||1);
+}
+function isoDate(d){
+  const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${dd}`;
+}
+function biweeklyPeriodFromStart(startStr){
+  const start = parseISODate(startStr);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 13); // 14-day cutoff, inclusive of the start date
+  return `${startStr}_${isoDate(end)}`;
+}
+// Inclusive date range covered by a period string, used for chronological sorting and overlap checks.
+function periodRange(p){
+  if(isBiweeklyPeriod(p)){
+    const [s,e] = p.split("_");
+    return { start: parseISODate(s), end: parseISODate(e) };
+  }
+  const [y,m] = p.split("-").map(Number);
+  return { start: new Date(y, (m||1)-1, 1), end: new Date(y, m||1, 0) }; // last day of month
+}
+function periodStart(p){ return periodRange(p).start; }
+function periodsOverlap(pA, pB){
+  const a = periodRange(pA), b = periodRange(pB);
+  return a.start <= b.end && b.start <= a.end;
+}
+// Finds another payroll record for the same employee whose period date range overlaps this one
+// (covers monthly-vs-monthly, bi-weekly-vs-bi-weekly, and mixed monthly/bi-weekly overlaps).
+function findOverlappingPayroll(employeeId, period, excludeId){
+  return db.payrolls.find(p => p.employeeId===employeeId && p.id!==excludeId && periodsOverlap(p.period, period));
+}
+function periodLabel(p){
+  if(isBiweeklyPeriod(p)){
+    const [s,e] = p.split("_");
+    const start = parseISODate(s), end = parseISODate(e);
+    const fmtShort = d => d.toLocaleString("en-US",{month:"short", day:"numeric"});
+    const fmtFull = d => d.toLocaleString("en-US",{month:"short", day:"numeric", year:"numeric"});
+    return `${fmtShort(start)} – ${fmtFull(end)} (Bi-Weekly)`;
+  }
+  const [y,m] = p.split("-");
+  const d = new Date(Number(y), Number(m)-1, 1);
+  return d.toLocaleString("en-US",{month:"long", year:"numeric"});
+}
+function findEmployee(id){ return db.employees.find(e=>e.id===id); }
+
+function openPrintWindow(title, innerHtml){
+  const w = window.open("", "_blank", "width=480,height=680");
+  if(!w){ toast("Please allow pop-ups to print.", "error"); return; }
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title><meta charset="UTF-8">
+    <style>
+      body{font-family:Arial,Helvetica,sans-serif;padding:28px;color:#222;}
+      h2{margin:0 0 18px 0;font-size:18px;}
+      .payslip{border:1px solid #ccc;border-radius:6px;overflow:hidden;}
+      .payslip-head{background:#f4f4f2;padding:14px 18px;display:flex;justify-content:space-between;border-bottom:1px solid #ccc;}
+      .payslip-row{display:flex;justify-content:space-between;padding:9px 18px;border-bottom:1px solid #ccc;font-size:13.5px;}
+      .payslip-row:last-child{border-bottom:none;}
+      .payslip-row.net{background:#ececea;font-weight:700;font-size:15px;}
+      table{width:100%;border-collapse:collapse;font-size:12.5px;}
+      th,td{padding:8px 10px;border-bottom:1px solid #ccc;text-align:left;}
+    </style></head><body>${innerHtml}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(()=>{ w.print(); }, 300);
+}
+
+function printPayslip(id){
+  const p = db.payrolls.find(x=>x.id===id);
+  if(!p) return;
+  openPrintWindow("Payslip", payslipHtml(p));
+}
+
+function getFilteredHistory(){
+  let list = [...db.payrolls];
+  if(state.historyFilterEmp) list = list.filter(p=>p.employeeId===state.historyFilterEmp);
+  if(state.historyFilterPeriod) list = list.filter(p=>p.period===state.historyFilterPeriod);
+  list.sort((a,b)=> periodStart(b.period) - periodStart(a.period));
+  return list;
+}
+
+function printPayrollHistory(){
+  const list = getFilteredHistory();
+  const rows = list.map(p=>{
+    const emp = findEmployee(p.employeeId) || {fullName:"(deleted employee)"};
+    const freq = (p.payFrequency||inferFrequencyFromPeriod(p.period))==="biweekly" ? "Bi-Weekly" : "Monthly";
+    return `<tr><td>${emp.fullName}</td><td>${periodLabel(p.period)}</td><td>${freq}</td><td>${money(p.basicSalary)}</td><td>${money(p.overtime)}</td><td>${money(p.allowances)}</td><td>${money(p.deductions)}</td><td>${money(p.gross)}</td><td>${money(p.net)}</td></tr>`;
+  }).join("");
+  const html = `<h2>Payroll History</h2><table><thead><tr><th>Employee</th><th>Period</th><th>Frequency</th><th>Basic</th><th>Overtime</th><th>Allowances</th><th>Deductions</th><th>Gross</th><th>Net</th></tr></thead><tbody>${rows}</tbody></table>`;
+  openPrintWindow("Payroll History", html);
+}
+
+function toast(msg, type){
+  const wrap = document.getElementById("toast-wrap");
+  const el = document.createElement("div");
+  el.className = "toast toast-" + (type||"success");
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(()=>{ el.style.opacity="0"; el.style.transition="opacity .25s"; setTimeout(()=>el.remove(),250); }, 2600);
+}
+
+/* ============================================================
+   ROUTING / RENDER
+============================================================ */
+function navigate(view){
+  state.view = view;
+  state.sidebarOpen = false;
+  render();
+}
+function logout(){
+  state.currentUser = null;
+  state.view = "login";
+  state.loginError = "";
+  render();
+}
+
+function handleLogin(e){
+  e.preventDefault();
+  const username = document.getElementById("login-username").value.trim();
+  const password = document.getElementById("login-password").value;
+
+  if(username === db.admin.username && password === db.admin.password){
+    state.currentUser = {role:"admin", username, fullName: db.admin.fullName};
+    state.view = "adminDashboard";
+    state.loginError = "";
+    render();
+    return;
+  }
+  const emp = db.employees.find(e => e.username === username && e.password === password);
+  if(emp){
+    state.currentUser = {role:"employee", username, employeeId: emp.id, fullName: emp.fullName};
+    state.view = "employeeDashboard";
+    state.loginError = "";
+    render();
+    return;
+  }
+  state.loginError = "Incorrect username or password.";
+  render();
+}
+
+function render(){
+  const root = document.getElementById("root");
+  if(!state.currentUser){
+    root.innerHTML = renderLogin();
+    document.getElementById("login-form").addEventListener("submit", handleLogin);
+    document.getElementById("toggle-login-pw").innerHTML = ICON_EYE;
+    document.getElementById("toggle-login-pw").addEventListener("click", () => {
+      const inp = document.getElementById("login-password");
+      const btn = document.getElementById("toggle-login-pw");
+      const showing = inp.type === "text";
+      inp.type = showing ? "password" : "text";
+      btn.innerHTML = showing ? ICON_EYE : ICON_EYE_OFF;
+      btn.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+    });
+    document.getElementById("forgot-password-link").addEventListener("click", (e) => {
+      e.preventDefault();
+      document.getElementById("forgot-password-note").classList.add("show");
+    });
+    return;
+  }
+  root.innerHTML = renderShell();
+  wireShellEvents();
+}
+
+/* ---------------- LOGIN ---------------- */
+function renderLogin(){
+  return `
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="brand" style="margin-bottom:28px;"><span class="mark"></span><h1>Ledger</h1></div>
+      ${state.loginError ? `<div class="login-error">${state.loginError}</div>` : ""}
+      <form id="login-form">
+        <div class="field">
+          <label for="login-username">Username or email</label>
+          <input id="login-username" type="text" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <div class="password-wrap">
+            <input id="login-password" type="password" autocomplete="current-password" required>
+            <button type="button" class="toggle-pw" id="toggle-login-pw" aria-label="Show password"></button>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Log in</button>
+      </form>
+      <div class="forgot-link-row">
+        <a href="#" id="forgot-password-link">Forgot password?</a>
+        <div class="forgot-note" id="forgot-password-note">Please contact your system administrator to reset your password.</div>
+      </div>
+      <div class="demo-hint">
+        Demo accounts — Admin: <code>admin</code> / <code>Admin123</code><br>
+        Employee: <code>juan.delacruz</code> / <code>Employee123</code>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------------- SHELL ---------------- */
+function navItemsFor(role){
+  if(role === "admin"){
+    return [
+      {v:"adminDashboard", label:"Dashboard"},
+      {v:"employees", label:"Employees"},
+      {v:"payroll", label:"Payroll"},
+      {v:"payrollHistory", label:"Payroll History"},
+      {v:"settings", label:"Payroll Settings"},
+      {v:"profile", label:"Profile"}
+    ];
+  }
+  return [
+    {v:"employeeDashboard", label:"Dashboard"},
+    {v:"myPayroll", label:"My Payroll"},
+    {v:"profile", label:"Profile"}
+  ];
+}
+
+function renderShell(){
+  const user = state.currentUser;
+  const items = navItemsFor(user.role);
+  const pageTitleMap = {
+    adminDashboard:"Dashboard", employeeDashboard:"Dashboard", employees:"Employees",
+    payroll:"Payroll", payrollHistory:"Payroll History", myPayroll:"My Payroll", profile:"Profile"
+  };
+
+  return `
+  <div id="app-shell">
+    <div class="overlay ${state.sidebarOpen?'show':''}" id="overlay"></div>
+    <aside class="sidebar ${state.sidebarOpen?'open':''}" id="sidebar">
+      <div class="sidebar-head">
+        <div class="brand"><span class="mark"></span><h1>Ledger</h1></div>
+        <span class="role-pill">${user.role === 'admin' ? 'Administrator' : 'Employee'}</span>
+      </div>
+      <nav class="nav-list">
+        ${items.map(it => `
+          <a href="#" class="nav-item ${state.view===it.v?'active':''}" data-nav="${it.v}">
+            <span class="dot"></span>${it.label}
+          </a>`).join("")}
+      </nav>
+      <div class="sidebar-foot">
+        <div class="user-chip">
+          <div class="avatar">${initials(user.fullName)}</div>
+          <div>
+            <div class="name">${user.fullName}</div>
+            <div class="sub">${user.role === 'admin' ? '@' + user.username : (findEmployee(user.employeeId)||{}).position || ''}</div>
+          </div>
+        </div>
+        <button class="btn btn-secondary btn-block btn-sm" id="logout-btn">Log out</button>
+      </div>
+    </aside>
+
+    <div class="main">
+      <div class="topbar">
+        <button class="hamburger" id="hamburger" aria-label="Open menu"><span></span><span></span><span></span></button>
+        <div class="brand"><span class="mark"></span><h1 style="font-size:17px;">Ledger</h1></div>
+        <div style="width:36px;"></div>
+      </div>
+      <div class="content" id="content">
+        ${renderPage(state.view)}
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="modal" id="modal-inner"></div>
+  </div>`;
+}
+
+function renderPage(view){
+  switch(view){
+    case "adminDashboard": return renderAdminDashboard();
+    case "employees": return renderEmployees();
+    case "payroll": return renderPayrollCreate();
+    case "payrollHistory": return renderPayrollHistory();
+    case "settings": return renderSettings();
+    case "employeeDashboard": return renderEmployeeDashboard();
+    case "myPayroll": return renderMyPayroll();
+    case "profile": return renderProfile();
+    default: return `<div class="empty-state">Page not found.</div>`;
+  }
+}
+
+/* ---------------- ADMIN DASHBOARD ---------------- */
+function latestRecordsPerEmployee(list, n){
+  // Returns, for every employee that has payroll records, their n most recent runs
+  // (by period end date) — used instead of a single shared "period" so the dashboard
+  // still makes sense when employees are on different pay frequencies.
+  const byEmp = {};
+  list.forEach(p=>{
+    if(!byEmp[p.employeeId]) byEmp[p.employeeId] = [];
+    byEmp[p.employeeId].push(p);
+  });
+  Object.values(byEmp).forEach(arr=> arr.sort((a,b)=> periodRange(b.period).end - periodRange(a.period).end));
+  return byEmp;
+}
+
+function renderAdminDashboard(){
+  const totalEmployees = db.employees.length;
+  const activeEmployees = db.employees.filter(e=>e.status==="Active").length;
+
+  const byEmp = latestRecordsPerEmployee(db.payrolls);
+  const latestRecords = Object.values(byEmp).map(arr=>arr[0]).filter(Boolean);
+  const prevRecords = Object.values(byEmp).map(arr=>arr[1]).filter(Boolean);
+  const mostRecentEnd = latestRecords.reduce((max,p)=>{
+    const end = periodRange(p.period).end;
+    return (!max || end>max) ? end : max;
+  }, null);
+
+  const totalPayroll = latestRecords.reduce((s,p)=>s+p.net,0);
+  const totalDeductions = latestRecords.reduce((s,p)=>s+p.deductions,0);
+  const prevTotalPayroll = prevRecords.reduce((s,p)=>s+p.net,0);
+  const prevTotalDeductions = prevRecords.reduce((s,p)=>s+p.deductions,0);
+  const recent = [...db.payrolls].sort((a,b)=> periodStart(b.period)-periodStart(a.period)).slice(0,6);
+
+  const deltaHtml = (curr, prev, invert) => {
+    if(prevRecords.length===0) return `<div class="ledger-sub">No prior run to compare</div>`;
+    const diff = curr - prev;
+    const pct = prev ? (diff/prev*100) : 0;
+    const good = invert ? diff <= 0 : diff >= 0;
+    const arrow = diff === 0 ? "—" : (diff > 0 ? "▲" : "▼");
+    return `<div class="ledger-delta ${good?'up':'down'}">${arrow} ${Math.abs(pct).toFixed(1)}% vs previous run</div>`;
+  };
+
+  return `
+  <div class="page-head">
+    <div><h2>Dashboard</h2><p>Each employee's most recent payroll run${mostRecentEnd ? " — through " + mostRecentEnd.toLocaleString("en-US",{month:"long",day:"numeric",year:"numeric"}) : ""}</p></div>
+  </div>
+  <div class="stat-grid">
+    <div class="ledger-strip">
+      <div class="ledger-stat clickable" data-nav="employees">
+        <div class="ledger-label">Total Employees</div>
+        <div class="ledger-figure">${totalEmployees}</div>
+        <div class="ledger-sub">${activeEmployees} active</div>
+      </div>
+      <div class="ledger-stat clickable" data-nav="payrollHistory">
+        <div class="ledger-label">Total Payroll, net</div>
+        <div class="ledger-figure">${money(totalPayroll)}</div>
+        ${deltaHtml(totalPayroll, prevTotalPayroll, false)}
+      </div>
+      <div class="ledger-stat clickable" data-nav="payrollHistory">
+        <div class="ledger-label">Total Deductions</div>
+        <div class="ledger-figure">${money(totalDeductions)}</div>
+        ${deltaHtml(totalDeductions, prevTotalDeductions, true)}
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <h3>Recent Payroll Records</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Employee</th><th>Period</th><th>Gross</th><th>Deductions</th><th>Net</th></tr></thead>
+        <tbody>
+          ${recent.map(r=>{
+            const emp = findEmployee(r.employeeId) || {fullName:"Unknown"};
+            return `<tr data-view-pr="${r.id}">
+              <td>${emp.fullName}</td>
+              <td>${periodLabel(r.period)}</td>
+              <td class="tabular">${money(r.gross)}</td>
+              <td class="tabular">${money(r.deductions)}</td>
+              <td class="tabular"><strong style="color:var(--c-green);">${money(r.net)}</strong></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ---------------- EMPLOYEES ---------------- */
+function renderEmployees(){
+  const q = state.employeeSearch.toLowerCase();
+  const list = db.employees.filter(e =>
+    e.fullName.toLowerCase().includes(q) || e.id.toLowerCase().includes(q) ||
+    e.department.toLowerCase().includes(q) || e.position.toLowerCase().includes(q)
+  );
+  const statusClass = s => s==="Active" ? "status-active" : (s==="On Leave" ? "status-leave" : "status-inactive");
+
+  return `
+  <div class="page-head">
+    <div><h2>Employees</h2><p>${db.employees.length} total</p></div>
+    <button class="btn btn-primary" id="add-employee-btn">Add Employee</button>
+  </div>
+  <div class="toolbar">
+    <input type="text" id="employee-search" placeholder="Search by name, ID, department..." value="${state.employeeSearch}">
+  </div>
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>ID</th><th>Name</th><th>Position</th><th>Department</th>
+          <th>Basic Salary</th><th>Status</th><th></th>
+        </tr></thead>
+        <tbody>
+          ${list.length === 0 ? `<tr><td colspan="7"><div class="empty-state">No employees match your search.</div></td></tr>` :
+          list.map(e => `
+            <tr>
+              <td class="tabular">${e.id}</td>
+              <td>${e.fullName}</td>
+              <td>${e.position}</td>
+              <td>${e.department}</td>
+              <td class="tabular">${money(e.basicSalary)}</td>
+              <td><span class="status-pill ${statusClass(e.status)}">${e.status}</span></td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">Edit</button>
+                  <button class="btn btn-ghost btn-sm" data-del-emp="${e.id}" style="color:var(--danger);">Delete</button>
+                </div>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function employeeFormHtml(emp){
+  const e = emp || {id:"", fullName:"", position:"", department:"", employmentStatus:"Regular", basicSalary:"", status:"Active", email:"", username:"", password:""};
+  const isEdit = !!emp;
+  return `
+  <div class="form-grid">
+    <div class="field span-2">
+      <label>Employee ID</label>
+      <input id="f-id" type="text" value="${e.id}" ${isEdit?"disabled":""} placeholder="e.g. EMP007">
+    </div>
+    <div class="field span-2">
+      <label>Full Name</label>
+      <input id="f-name" type="text" value="${e.fullName}" required>
+    </div>
+    <div class="field">
+      <label>Position</label>
+      <input id="f-position" type="text" value="${e.position}" required>
+    </div>
+    <div class="field">
+      <label>Department</label>
+      <input id="f-department" type="text" value="${e.department}" required>
+    </div>
+    <div class="field">
+      <label>Monthly Basic Salary</label>
+      <input id="f-basic" type="number" min="0" step="0.01" value="${e.basicSalary}" required>
+    </div>
+    <div class="field">
+      <label>Employment Status</label>
+      <select id="f-empstatus">
+        <option ${e.employmentStatus==="Regular"?"selected":""}>Regular</option>
+        <option ${e.employmentStatus==="Probationary"?"selected":""}>Probationary</option>
+        <option ${e.employmentStatus==="Contractual"?"selected":""}>Contractual</option>
+        <option ${e.employmentStatus==="Part-time"?"selected":""}>Part-time</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Account Status</label>
+      <select id="f-status">
+        <option ${e.status==="Active"?"selected":""}>Active</option>
+        <option ${e.status==="On Leave"?"selected":""}>On Leave</option>
+        <option ${e.status==="Inactive"?"selected":""}>Inactive</option>
+      </select>
+    </div>
+    <div class="field span-2">
+      <label>Email</label>
+      <input id="f-email" type="email" value="${e.email}" required>
+    </div>
+    <div class="field">
+      <label>Login Username</label>
+      <input id="f-username" type="text" value="${e.username}" required>
+    </div>
+    <div class="field">
+      <label>Login Password</label>
+      <input id="f-password" type="text" value="${e.password}" required>
+    </div>
+  </div>`;
+}
+
+function openEmployeeModal(empId){
+  const emp = empId ? findEmployee(empId) : null;
+  state.editingEmployeeId = empId || null;
+  openModal({
+    title: emp ? "Edit Employee" : "Add Employee",
+    bodyHtml: employeeFormHtml(emp),
+    confirmLabel: emp ? "Save Changes" : "Add Employee",
+    onConfirm: () => saveEmployeeForm(emp)
+  });
+}
+
+function saveEmployeeForm(existing){
+  const id = document.getElementById("f-id").value.trim();
+  const fullName = document.getElementById("f-name").value.trim();
+  const position = document.getElementById("f-position").value.trim();
+  const department = document.getElementById("f-department").value.trim();
+  const basicSalary = Number(document.getElementById("f-basic").value);
+  const employmentStatus = document.getElementById("f-empstatus").value;
+  const status = document.getElementById("f-status").value;
+  const email = document.getElementById("f-email").value.trim();
+  const username = document.getElementById("f-username").value.trim();
+  const password = document.getElementById("f-password").value;
+
+  if(!id || !fullName || !position || !department || !email || !username || !password){
+    toast("Please fill in all required fields.", "error");
+    return;
+  }
+  if(!existing && db.employees.some(e=>e.id===id)){
+    toast("An employee with that ID already exists.", "error");
+    return;
+  }
+  if(db.employees.some(e => e.username === username && (!existing || e.id !== existing.id))){
+    toast("That username is already taken.", "error");
+    return;
+  }
+
+  const record = {id, fullName, position, department, employmentStatus, basicSalary, status, email, username, password};
+
+  if(existing){
+    const idx = db.employees.findIndex(e=>e.id===existing.id);
+    db.employees[idx] = record;
+    toast("Employee updated.");
+  }else{
+    db.employees.push(record);
+    toast("Employee added.");
+  }
+  saveDB(db);
+  closeModal();
+  render();
+}
+
+function confirmDeleteEmployee(id){
+  const emp = findEmployee(id);
+  openConfirmModal({
+    title:"Delete Employee",
+    message: `Delete ${emp.fullName} (${emp.id})? This will also remove their payroll history. This cannot be undone.`,
+    confirmLabel:"Delete",
+    danger:true,
+    onConfirm: () => {
+      db.employees = db.employees.filter(e=>e.id!==id);
+      db.payrolls = db.payrolls.filter(p=>p.employeeId!==id);
+      saveDB(db);
+      toast("Employee deleted.");
+      closeModal();
+      render();
+    }
+  });
+}
+
+/* ---------------- PAYROLL: GENERATE ---------------- */
+const PR_FIELD_IDS = ["pr-othours","pr-nsdhours","pr-allow","pr-holiday","pr-bonus","pr-incentive","pr-other",
+  "pr-loan","pr-advance","pr-absences","pr-tardiness","pr-undertime","pr-comploan","pr-otherded"];
+
+function renderPayrollCreate(){
+  const options = db.employees.map(e=>`<option value="${e.id}">${e.fullName} — ${e.id}</option>`).join("");
+  return `
+  <div class="page-head">
+    <div><h2>Generate Payroll</h2><p>Select an employee, enter this period's variable figures, and the system computes statutory rates automatically.</p></div>
+  </div>
+  <div class="panel" style="max-width:720px;">
+    <div class="form-grid">
+      <div class="field"><label>Employee</label><select id="pr-employee">${options}</select></div>
+      <div class="field"><label>Pay Frequency</label>
+        <select id="pr-frequency">
+          <option value="monthly">Monthly</option>
+          <option value="biweekly">Bi-Weekly (14-day cutoff)</option>
+        </select>
+      </div>
+      <div class="field span-2" id="pr-period-monthly-wrap">
+        <label>Payroll Period</label>
+        <input id="pr-period-month" type="month" value="2026-09">
+      </div>
+      <div class="field span-2" id="pr-period-biweekly-wrap" style="display:none;">
+        <label>Cutoff Start Date</label>
+        <input id="pr-period-start" type="date" value="2026-09-01">
+        <div id="pr-period-range-display" style="font-size:12px;color:var(--ink-soft);margin-top:6px;"></div>
+      </div>
+    </div>
+    <h3 style="margin-top:6px;">Basic Pay</h3>
+    <div class="form-grid">
+      <div class="field"><label>Monthly Salary</label><input id="pr-monthly" type="text" disabled></div>
+      <div class="field"><label id="pr-basicpay-label">Basic Pay (this period)</label><input id="pr-basicpay" type="text" disabled></div>
+      <div class="field"><label>Daily Rate</label><input id="pr-daily" type="text" disabled></div>
+      <div class="field"><label>Hourly Rate</label><input id="pr-hourly" type="text" disabled></div>
+      <div class="field span-2"><label>Regular Hours Worked</label><input id="pr-reghours" type="number" min="0" step="0.5" value="176"></div>
+    </div>
+    <h3>Overtime &amp; Night Differential</h3>
+    <div class="form-grid">
+      <div class="field"><label>Overtime Hours <span style="color:var(--ink-faint);">(125% of hourly rate)</span></label><input id="pr-othours" type="number" min="0" step="0.5" value="0"></div>
+      <div class="field"><label>Night Differential Hours <span style="color:var(--ink-faint);">(+10% of hourly rate)</span></label><input id="pr-nsdhours" type="number" min="0" step="0.5" value="0"></div>
+    </div>
+    <h3>Other Earnings</h3>
+    <div class="form-grid">
+      <div class="field"><label>Allowances</label><input id="pr-allow" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Holiday Pay</label><input id="pr-holiday" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Bonuses</label><input id="pr-bonus" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Incentives</label><input id="pr-incentive" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field span-2"><label>Other Earnings</label><input id="pr-other" type="number" min="0" step="0.01" value="0"></div>
+    </div>
+    <h3>Other Deductions</h3>
+    <div class="form-grid">
+      <div class="field"><label>Salary Loan</label><input id="pr-loan" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Cash Advance</label><input id="pr-advance" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Absences</label><input id="pr-absences" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Tardiness</label><input id="pr-tardiness" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Undertime</label><input id="pr-undertime" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Company Loan</label><input id="pr-comploan" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field span-2"><label>Other Deductions</label><input id="pr-otherded" type="number" min="0" step="0.01" value="0"></div>
+    </div>
+    <h3>Preview</h3>
+    <div class="calc-preview" id="pr-preview"></div>
+    <div style="margin-top:18px;display:flex;justify-content:flex-end;">
+      <button class="btn btn-primary" id="pr-submit">Generate Payroll Record</button>
+    </div>
+  </div>`;
+}
+
+function readPayrollForm(){
+  const g = id => Number(document.getElementById(id).value)||0;
+  return {
+    regularHoursWorked: g("pr-reghours"), otHours: g("pr-othours"), nsdHours: g("pr-nsdhours"),
+    allowances: g("pr-allow"), holidayPay: g("pr-holiday"), bonuses: g("pr-bonus"),
+    incentives: g("pr-incentive"), otherEarnings: g("pr-other"),
+    salaryLoan: g("pr-loan"), cashAdvance: g("pr-advance"), absences: g("pr-absences"),
+    tardiness: g("pr-tardiness"), undertime: g("pr-undertime"), companyLoan: g("pr-comploan"),
+    otherDeductions: g("pr-otherded")
+  };
+}
+
+function getPayrollFormFrequency(){
+  const el = document.getElementById("pr-frequency");
+  return el ? el.value : "monthly";
+}
+function getPayrollFormPeriod(){
+  if(getPayrollFormFrequency()==="biweekly"){
+    const startVal = document.getElementById("pr-period-start").value;
+    return startVal ? biweeklyPeriodFromStart(startVal) : "";
+  }
+  return document.getElementById("pr-period-month").value;
+}
+
+function wirePayrollCreate(){
+  const empSelect = document.getElementById("pr-employee");
+  if(!empSelect) return;
+  const freqSelect = document.getElementById("pr-frequency");
+  const monthlyWrap = document.getElementById("pr-period-monthly-wrap");
+  const biweeklyWrap = document.getElementById("pr-period-biweekly-wrap");
+  const reghoursInput = document.getElementById("pr-reghours");
+
+  function toggleFrequencyUI(){
+    const isBiweekly = freqSelect.value === "biweekly";
+    monthlyWrap.style.display = isBiweekly ? "none" : "";
+    biweeklyWrap.style.display = isBiweekly ? "" : "none";
+    document.getElementById("pr-basicpay-label").textContent = isBiweekly ? "Basic Pay (this cutoff)" : "Basic Pay (this period)";
+    // Nudge the default regular-hours figure to match the cutoff length, without overriding a user edit.
+    if(reghoursInput && !reghoursInput.dataset.touched){
+      reghoursInput.value = isBiweekly ? "88" : "176";
+    }
+    updateRangeDisplay();
+  }
+  function updateRangeDisplay(){
+    if(freqSelect.value !== "biweekly") return;
+    const startVal = document.getElementById("pr-period-start").value;
+    const disp = document.getElementById("pr-period-range-display");
+    if(startVal){
+      const period = biweeklyPeriodFromStart(startVal);
+      disp.textContent = "Covers: " + periodLabel(period);
+    } else {
+      disp.textContent = "";
+    }
+  }
+
+  function updatePreview(){
+    const emp = findEmployee(empSelect.value);
+    if(!emp) return;
+    const period = getPayrollFormPeriod() || "2026-09";
+    const frequency = getPayrollFormFrequency();
+    const rec = computePayrollRecord(emp, period, readPayrollForm(), db.settings, frequency);
+    document.getElementById("pr-monthly").value = money(emp.basicSalary);
+    document.getElementById("pr-basicpay").value = money(rec.basicSalary);
+    document.getElementById("pr-daily").value = money(rec.dailyRate);
+    document.getElementById("pr-hourly").value = money(rec.hourlyRate);
+    document.getElementById("pr-preview").innerHTML = payrollPreviewHtml(rec);
+  }
+
+  empSelect.addEventListener("change", updatePreview);
+  freqSelect.addEventListener("change", () => { toggleFrequencyUI(); updatePreview(); });
+  document.getElementById("pr-period-month").addEventListener("change", updatePreview);
+  document.getElementById("pr-period-start").addEventListener("change", () => { updateRangeDisplay(); updatePreview(); });
+  if(reghoursInput) reghoursInput.addEventListener("input", () => { reghoursInput.dataset.touched = "1"; });
+  PR_FIELD_IDS.concat(["pr-reghours"]).forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener("input", updatePreview);
+  });
+  toggleFrequencyUI();
+  updatePreview();
+
+  document.getElementById("pr-submit").addEventListener("click", () => {
+    const employeeId = empSelect.value;
+    const emp = findEmployee(employeeId);
+    const frequency = getPayrollFormFrequency();
+    const periodRaw = getPayrollFormPeriod();
+    if(!periodRaw){ toast("Please select a payroll period.", "error"); return; }
+    const overlap = findOverlappingPayroll(employeeId, periodRaw, null);
+    if(overlap){
+      toast(`A payroll record already exists for ${emp.fullName} covering ${periodLabel(overlap.period)}. Choose a period that doesn't overlap.`, "error");
+      return;
+    }
+    const rec = computePayrollRecord(emp, periodRaw, readPayrollForm(), db.settings, frequency);
+    rec.id = "PR" + String(db.payrolls.length+1).padStart(4,"0") + Math.floor(Math.random()*90+10);
+    db.payrolls.push(rec);
+    saveDB(db);
+    toast("Payroll record generated.");
+    navigate("payrollHistory");
+  });
+}
+
+function payrollPreviewHtml(rec){
+  return `
+    <div class="calc-row"><span>Pay Frequency</span><span class="tabular">${rec.payFrequency==="biweekly" ? "Bi-Weekly" : "Monthly"}</span></div>
+    <div class="calc-row"><span>Basic Salary</span><span class="tabular">${money(rec.basicSalary)}</span></div>
+    <div class="calc-row"><span>Overtime Pay (${rec.otHours} hrs × ${Math.round(rec.otMultiplier*100)}%)</span><span class="tabular">${money(rec.otPay)}</span></div>
+    <div class="calc-row"><span>Night Differential (${rec.nsdHours} hrs × ${Math.round(rec.nsdRate*100)}%)</span><span class="tabular">${money(rec.nsdPay)}</span></div>
+    <div class="calc-row"><span>Other Earnings</span><span class="tabular">${money(rec.allowances+rec.holidayPay+rec.bonuses+rec.incentives+rec.otherEarnings)}</span></div>
+    <div class="calc-row total"><span>Gross Pay</span><span class="tabular">${money(rec.gross)}</span></div>
+    <div class="calc-row" style="margin-top:8px;"><span>SSS (EE ${Math.round(rec.sss.eeRate*100)}% of MSC ${money(rec.sss.msc)})</span><span class="tabular">− ${money(rec.sss.ee)}</span></div>
+    <div class="calc-row"><span>PhilHealth (EE ${Math.round(rec.philhealth.eeShare*100)}% of ${Math.round(rec.philhealth.rate*100)}%)</span><span class="tabular">− ${money(rec.philhealth.ee)}</span></div>
+    <div class="calc-row"><span>Pag-IBIG (${Math.round(rec.pagibig.eeRate*100)}%)</span><span class="tabular">− ${money(rec.pagibig.ee)}</span></div>
+    <div class="calc-row"><span>Withholding Tax</span><span class="tabular">− ${money(rec.withholdingTax.amount)}</span></div>
+    <div class="calc-row"><span>Other Deductions</span><span class="tabular">− ${money(rec.otherDeductTotal)}</span></div>
+    <div class="calc-row total"><span>Net Pay</span><span class="tabular">${money(rec.net)}</span></div>`;
+}
+
+/* ---------------- PAYROLL HISTORY ---------------- */
+function renderPayrollHistory(){
+  const empOptions = `<option value="">All Employees</option>` + db.employees.map(e=>`<option value="${e.id}" ${state.historyFilterEmp===e.id?"selected":""}>${e.fullName}</option>`).join("");
+  const periods = [...new Set(db.payrolls.map(p=>p.period))].sort((a,b)=> periodStart(b)-periodStart(a));
+  const periodOptions = `<option value="">All Periods</option>` + periods.map(p=>`<option value="${p}" ${state.historyFilterPeriod===p?"selected":""}>${periodLabel(p)}</option>`).join("");
+
+  const list = getFilteredHistory();
+
+  return `
+  <div class="page-head">
+    <div><h2>Payroll History</h2><p>${list.length} record${list.length===1?"":"s"}</p></div>
+  </div>
+  <div class="toolbar">
+    <div class="filters">
+      <select id="hist-emp-filter">${empOptions}</select>
+      <select id="hist-period-filter">${periodOptions}</select>
+    </div>
+    <button class="btn btn-secondary btn-sm" id="print-history-btn">Print</button>
+  </div>
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Employee</th><th>Period</th><th>Frequency</th><th>Basic</th><th>Overtime</th><th>Allowances</th>
+          <th>Deductions</th><th>Gross</th><th>Net</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${list.length===0 ? `<tr><td colspan="10"><div class="empty-state">No payroll records match this filter.</div></td></tr>` :
+        list.map(p=>{
+          const emp = findEmployee(p.employeeId) || {fullName:"(deleted employee)"};
+          const freq = p.payFrequency || inferFrequencyFromPeriod(p.period);
+          return `<tr>
+            <td>${emp.fullName}</td>
+            <td>${periodLabel(p.period)}</td>
+            <td><span class="status-pill ${freq==="biweekly"?"status-leave":"status-active"}">${freq==="biweekly"?"Bi-Weekly":"Monthly"}</span></td>
+            <td class="tabular">${money(p.basicSalary)}</td>
+            <td class="tabular">${money(p.overtime)}</td>
+            <td class="tabular">${money(p.allowances)}</td>
+            <td class="tabular">${money(p.deductions)}</td>
+            <td class="tabular">${money(p.gross)}</td>
+            <td class="tabular"><strong>${money(p.net)}</strong></td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" data-view-pr="${p.id}">View</button>
+                <button class="btn btn-ghost btn-sm" data-print-pr="${p.id}">Download PDF</button>
+                <button class="btn btn-ghost btn-sm" data-recalc-pr="${p.id}">Recalculate</button>
+                <button class="btn btn-ghost btn-sm" data-edit-pr="${p.id}">Edit</button>
+                <button class="btn btn-ghost btn-sm" data-del-pr="${p.id}" style="color:var(--danger);">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function payslipHtml(p){
+  const emp = findEmployee(p.employeeId) || {id:p.employeeId, fullName:"(deleted employee)", position:"", department:"", employmentStatus:""};
+  const s = db.settings;
+  const otherEarn = round2(p.allowances+p.holidayPay+p.bonuses+p.incentives+p.otherEarnings);
+  return `
+  <div class="payslip">
+    <div class="payslip-head" style="flex-direction:column;align-items:flex-start;gap:2px;">
+      <strong style="font-size:15px;">${s.companyName}</strong>
+      <span style="font-size:11.5px;color:var(--ink-soft);">${s.companyAddress}</span>
+    </div>
+    <div class="payslip-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+      <div style="display:flex;justify-content:space-between;width:100%;"><strong>${emp.fullName}</strong><span style="color:var(--ink-soft);">${periodLabel(p.period)}</span></div>
+      <div style="font-size:12px;color:var(--ink-soft);">ID ${emp.id} · ${emp.position||""}${emp.department? " · "+emp.department:""}${emp.employmentStatus? " · "+emp.employmentStatus:""}</div>
+      <div style="font-size:12px;color:var(--ink-soft);">Pay Frequency: ${(p.payFrequency||inferFrequencyFromPeriod(p.period))==="biweekly" ? "Bi-Weekly" : "Monthly"}</div>
+      <div style="font-size:12px;color:var(--ink-soft);">Pay Date: ${s.payDate}</div>
+    </div>
+
+    <div class="payslip-row" style="background:var(--bg);font-weight:600;">EARNINGS</div>
+    <div class="payslip-row"><span>Basic Salary</span><span class="tabular">${money(p.basicSalary)}</span></div>
+    <div class="payslip-row"><span>Overtime Pay — ${p.otHours} hrs @ ${Math.round(p.otMultiplier*100)}%</span><span class="tabular">${money(p.otPay)}</span></div>
+    <div class="payslip-row"><span>Night Differential — ${p.nsdHours} hrs @ ${Math.round(p.nsdRate*100)}%</span><span class="tabular">${money(p.nsdPay)}</span></div>
+    <div class="payslip-row"><span>Holiday Pay</span><span class="tabular">${money(p.holidayPay)}</span></div>
+    <div class="payslip-row"><span>Allowances</span><span class="tabular">${money(p.allowances)}</span></div>
+    <div class="payslip-row"><span>Bonuses / Incentives / Other</span><span class="tabular">${money(round2(p.bonuses+p.incentives+p.otherEarnings))}</span></div>
+    <div class="payslip-row net" style="background:var(--accent-soft);"><span>TOTAL EARNINGS (Gross Pay)</span><span class="tabular">${money(p.gross)}</span></div>
+
+    <div class="payslip-row" style="background:var(--bg);font-weight:600;">GOVERNMENT-MANDATED DEDUCTIONS</div>
+    <div class="payslip-row"><span>SSS — Employee Share ${Math.round(p.sss.eeRate*100)}% of MSC ${money(p.sss.msc)}</span><span class="tabular">− ${money(p.sss.ee)}</span></div>
+    <div class="payslip-row"><span>PhilHealth — Employee Share ${Math.round(p.philhealth.eeShare*100)}% (Total Rate ${Math.round(p.philhealth.rate*100)}%)</span><span class="tabular">− ${money(p.philhealth.ee)}</span></div>
+    <div class="payslip-row"><span>Pag-IBIG — Employee Rate ${Math.round(p.pagibig.eeRate*100)}%</span><span class="tabular">− ${money(p.pagibig.ee)}</span></div>
+    <div class="payslip-row"><span>Withholding Tax — per BIR table</span><span class="tabular">− ${money(p.withholdingTax.amount)}</span></div>
+
+    <div class="payslip-row" style="background:var(--bg);font-weight:600;">OTHER DEDUCTIONS</div>
+    ${p.salaryLoan?`<div class="payslip-row"><span>Salary Loan</span><span class="tabular">− ${money(p.salaryLoan)}</span></div>`:""}
+    ${p.cashAdvance?`<div class="payslip-row"><span>Cash Advance</span><span class="tabular">− ${money(p.cashAdvance)}</span></div>`:""}
+    ${p.absences?`<div class="payslip-row"><span>Absences</span><span class="tabular">− ${money(p.absences)}</span></div>`:""}
+    ${p.tardiness?`<div class="payslip-row"><span>Tardiness</span><span class="tabular">− ${money(p.tardiness)}</span></div>`:""}
+    ${p.undertime?`<div class="payslip-row"><span>Undertime</span><span class="tabular">− ${money(p.undertime)}</span></div>`:""}
+    ${p.companyLoan?`<div class="payslip-row"><span>Company Loan</span><span class="tabular">− ${money(p.companyLoan)}</span></div>`:""}
+    ${p.otherDeductions?`<div class="payslip-row"><span>Other Deductions</span><span class="tabular">− ${money(p.otherDeductions)}</span></div>`:""}
+    <div class="payslip-row net"><span>TOTAL DEDUCTIONS</span><span class="tabular">− ${money(p.totalDeductions)}</span></div>
+
+    <div class="payslip-row net" style="font-size:16px;"><span>NET PAY</span><span class="tabular">${money(p.net)}</span></div>
+  </div>`;
+}
+
+function openViewPayroll(id){
+  const p = db.payrolls.find(x=>x.id===id);
+  const body = payslipHtml(p) + `<div class="print-row"><button class="btn btn-secondary btn-sm" data-print-pr="${p.id}">Print Payslip</button></div>`;
+  openModal({title:"Payroll Record", bodyHtml: body, confirmLabel:null});
+  document.querySelectorAll("[data-print-pr]").forEach(el=>{
+    el.addEventListener("click", ()=> printPayslip(el.getAttribute("data-print-pr")));
+  });
+}
+
+function editPayrollFormHtml(p){
+  const emp = findEmployee(p.employeeId) || {};
+  const g = (id,val) => `<input id="${id}" type="number" min="0" step="0.5" value="${val}">`;
+  const freq = p.payFrequency || inferFrequencyFromPeriod(p.period);
+  const isBiweekly = freq === "biweekly";
+  const range = isBiweekly ? periodRange(p.period) : null;
+  return `
+  <div class="form-grid">
+    <div class="field span-2"><label>Employee</label><input type="text" value="${emp.fullName||''} — ${p.employeeId}" disabled></div>
+    <div class="field"><label>Pay Frequency</label>
+      <select id="ep-frequency">
+        <option value="monthly" ${!isBiweekly?"selected":""}>Monthly</option>
+        <option value="biweekly" ${isBiweekly?"selected":""}>Bi-Weekly (14-day cutoff)</option>
+      </select>
+    </div>
+    <div class="field" id="ep-period-monthly-wrap" style="display:${isBiweekly?"none":""};">
+      <label>Payroll Period</label>
+      <input id="ep-period-month" type="month" value="${isBiweekly ? "" : p.period}">
+    </div>
+    <div class="field" id="ep-period-biweekly-wrap" style="display:${isBiweekly?"":"none"};">
+      <label>Cutoff Start Date</label>
+      <input id="ep-period-start" type="date" value="${isBiweekly ? isoDate(range.start) : ""}">
+      <div id="ep-period-range-display" style="font-size:12px;color:var(--ink-soft);margin-top:6px;"></div>
+    </div>
+    <div class="field"><label>Regular Hours Worked</label>${g("ep-reghours", p.regularHoursWorked)}</div>
+    <div class="field"><label>Overtime Hours</label>${g("ep-othours", p.otHours)}</div>
+    <div class="field"><label>Night Diff. Hours</label>${g("ep-nsdhours", p.nsdHours)}</div>
+    <div class="field"><label>Allowances</label>${g("ep-allow", p.allowances)}</div>
+    <div class="field"><label>Holiday Pay</label>${g("ep-holiday", p.holidayPay)}</div>
+    <div class="field"><label>Bonuses</label>${g("ep-bonus", p.bonuses)}</div>
+    <div class="field"><label>Incentives</label>${g("ep-incentive", p.incentives)}</div>
+    <div class="field"><label>Other Earnings</label>${g("ep-other", p.otherEarnings)}</div>
+    <div class="field"><label>Salary Loan</label>${g("ep-loan", p.salaryLoan)}</div>
+    <div class="field"><label>Cash Advance</label>${g("ep-advance", p.cashAdvance)}</div>
+    <div class="field"><label>Absences</label>${g("ep-absences", p.absences)}</div>
+    <div class="field"><label>Tardiness</label>${g("ep-tardiness", p.tardiness)}</div>
+    <div class="field"><label>Undertime</label>${g("ep-undertime", p.undertime)}</div>
+    <div class="field"><label>Company Loan</label>${g("ep-comploan", p.companyLoan)}</div>
+    <div class="field span-2"><label>Other Deductions</label>${g("ep-otherded", p.otherDeductions)}</div>
+  </div>
+  <div class="calc-preview" id="ep-preview" style="margin-top:14px;"></div>`;
+}
+
+const EP_FIELD_IDS = ["ep-reghours","ep-othours","ep-nsdhours","ep-allow","ep-holiday","ep-bonus","ep-incentive","ep-other","ep-loan","ep-advance","ep-absences","ep-tardiness","ep-undertime","ep-comploan","ep-otherded"];
+
+function readEditPayrollForm(){
+  const g = id => Number(document.getElementById(id).value)||0;
+  return {
+    regularHoursWorked: g("ep-reghours"), otHours: g("ep-othours"), nsdHours: g("ep-nsdhours"),
+    allowances: g("ep-allow"), holidayPay: g("ep-holiday"), bonuses: g("ep-bonus"),
+    incentives: g("ep-incentive"), otherEarnings: g("ep-other"),
+    salaryLoan: g("ep-loan"), cashAdvance: g("ep-advance"), absences: g("ep-absences"),
+    tardiness: g("ep-tardiness"), undertime: g("ep-undertime"), companyLoan: g("ep-comploan"),
+    otherDeductions: g("ep-otherded")
+  };
+}
+
+function getEditFormFrequency(){
+  const el = document.getElementById("ep-frequency");
+  return el ? el.value : "monthly";
+}
+function getEditFormPeriod(){
+  if(getEditFormFrequency()==="biweekly"){
+    const startVal = document.getElementById("ep-period-start").value;
+    return startVal ? biweeklyPeriodFromStart(startVal) : "";
+  }
+  return document.getElementById("ep-period-month").value;
+}
+
+function openEditPayroll(id){
+  const p = db.payrolls.find(x=>x.id===id);
+  const emp = findEmployee(p.employeeId);
+  state.editingPayrollId = id;
+  openModal({
+    title:"Edit Payroll Record",
+    bodyHtml: editPayrollFormHtml(p),
+    confirmLabel:"Save Changes",
+    onConfirm: () => saveEditedPayroll(p, emp)
+  });
+
+  const freqSelect = document.getElementById("ep-frequency");
+  const monthlyWrap = document.getElementById("ep-period-monthly-wrap");
+  const biweeklyWrap = document.getElementById("ep-period-biweekly-wrap");
+
+  function toggleFrequencyUI(){
+    const isBiweekly = freqSelect.value === "biweekly";
+    monthlyWrap.style.display = isBiweekly ? "none" : "";
+    biweeklyWrap.style.display = isBiweekly ? "" : "none";
+    updateRangeDisplay();
+  }
+  function updateRangeDisplay(){
+    if(freqSelect.value !== "biweekly") return;
+    const startVal = document.getElementById("ep-period-start").value;
+    const disp = document.getElementById("ep-period-range-display");
+    disp.textContent = startVal ? "Covers: " + periodLabel(biweeklyPeriodFromStart(startVal)) : "";
+  }
+  const upd = () => {
+    if(!emp) return;
+    const period = getEditFormPeriod() || p.period;
+    const frequency = getEditFormFrequency();
+    const rec = computePayrollRecord(emp, period, readEditPayrollForm(), db.settings, frequency);
+    document.getElementById("ep-preview").innerHTML = payrollPreviewHtml(rec);
+  };
+  EP_FIELD_IDS.forEach(id2=>document.getElementById(id2).addEventListener("input", upd));
+  freqSelect.addEventListener("change", () => { toggleFrequencyUI(); upd(); });
+  document.getElementById("ep-period-month").addEventListener("change", upd);
+  document.getElementById("ep-period-start").addEventListener("change", () => { updateRangeDisplay(); upd(); });
+  toggleFrequencyUI();
+  upd();
+}
+
+function saveEditedPayroll(existing, emp){
+  const frequency = getEditFormFrequency();
+  const period = getEditFormPeriod();
+  if(!period){ toast("Please select a payroll period.", "error"); return; }
+  const overlap = findOverlappingPayroll(existing.employeeId, period, existing.id);
+  if(overlap){
+    toast(`Another payroll record already exists covering ${periodLabel(overlap.period)}. Choose a period that doesn't overlap.`, "error");
+    return;
+  }
+  if(!emp){ toast("This employee no longer exists.", "error"); return; }
+
+  const rec = computePayrollRecord(emp, period, readEditPayrollForm(), db.settings, frequency);
+  rec.id = existing.id;
+  const idx = db.payrolls.findIndex(p=>p.id===existing.id);
+  db.payrolls[idx] = rec;
+  saveDB(db);
+  toast("Payroll record updated.");
+  closeModal();
+  render();
+}
+
+function recalculatePayroll(id){
+  const p = db.payrolls.find(x=>x.id===id);
+  const emp = findEmployee(p.employeeId);
+  if(!p || !emp){ toast("Cannot recalculate — employee record not found.", "error"); return; }
+  const rec = computePayrollRecord(emp, p.period, p, db.settings, p.payFrequency);
+  rec.id = p.id;
+  const idx = db.payrolls.findIndex(x=>x.id===id);
+  db.payrolls[idx] = rec;
+  saveDB(db);
+  toast("Payroll recalculated using current rates.");
+  render();
+}
+
+function confirmDeletePayroll(id){
+  const p = db.payrolls.find(x=>x.id===id);
+  const emp = findEmployee(p.employeeId) || {fullName:"this employee"};
+  openConfirmModal({
+    title:"Delete Payroll Record",
+    message: `Delete the ${periodLabel(p.period)} payroll record for ${emp.fullName}? This cannot be undone.`,
+    confirmLabel:"Delete",
+    danger:true,
+    onConfirm: () => {
+      db.payrolls = db.payrolls.filter(x=>x.id!==id);
+      saveDB(db);
+      toast("Payroll record deleted.");
+      closeModal();
+      render();
+    }
+  });
+}
+
+/* ---------------- EMPLOYEE DASHBOARD ---------------- */
+function renderEmployeeDashboard(){
+  const emp = findEmployee(state.currentUser.employeeId);
+  const records = db.payrolls.filter(p=>p.employeeId===emp.id).sort((a,b)=> periodStart(b.period)-periodStart(a.period));
+  const latest = records[0];
+  const previous = records[1];
+  let netDelta = "";
+  if(latest && previous){
+    const diff = latest.net - previous.net;
+    const pct = previous.net ? (diff/previous.net*100) : 0;
+    const arrow = diff === 0 ? "—" : (diff > 0 ? "▲" : "▼");
+    netDelta = `<div class="ledger-delta ${diff>=0?'up':'down'}">${arrow} ${Math.abs(pct).toFixed(1)}% vs ${periodLabel(previous.period)}</div>`;
+  }
+
+  return `
+  <div class="page-head">
+    <div><h2>Welcome, ${emp.fullName.split(" ")[0]}</h2><p>${emp.position} · ${emp.department}</p></div>
+  </div>
+  <div class="stat-grid">
+    <div class="ledger-strip">
+      <div class="ledger-stat clickable" data-nav="profile">
+        <div class="ledger-label">Employment Status</div>
+        <div class="ledger-figure" style="font-size:22px;">${emp.status}</div>
+        <div class="ledger-sub">${emp.employmentStatus||""}</div>
+      </div>
+      <div class="ledger-stat clickable" data-nav="myPayroll">
+        <div class="ledger-label">Current Net Salary</div>
+        <div class="ledger-figure">${latest ? money(latest.net) : "—"}</div>
+        ${netDelta || `<div class="ledger-sub">${latest?'':'No payslips yet'}</div>`}
+      </div>
+      <div class="ledger-stat clickable" data-nav="myPayroll">
+        <div class="ledger-label">Latest Payroll Period</div>
+        <div class="ledger-figure" style="font-size:22px;">${latest ? periodLabel(latest.period) : "—"}</div>
+        <div class="ledger-sub">${db.settings.payDate}</div>
+      </div>
+    </div>
+  </div>
+  ${latest ? `<div class="panel"><h3>Latest Payslip</h3>${payslipHtml(latest)}<div class="print-row"><button class="btn btn-secondary btn-sm" data-print-pr="${latest.id}">Print Payslip</button></div></div>` :
+    `<div class="panel"><div class="empty-state">No payroll records yet.</div></div>`}
+  `;
+}
+
+/* ---------------- MY PAYROLL ---------------- */
+function renderMyPayroll(){
+  const emp = findEmployee(state.currentUser.employeeId);
+  const records = db.payrolls.filter(p=>p.employeeId===emp.id).sort((a,b)=> periodStart(b.period)-periodStart(a.period));
+
+  return `
+  <div class="page-head">
+    <div><h2>My Payroll</h2><p>Your payroll history, ${emp.fullName}</p></div>
+  </div>
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Period</th><th>Basic</th><th>Overtime</th><th>Allowances</th><th>Deductions</th><th>Gross</th><th>Net</th><th></th></tr></thead>
+        <tbody>
+        ${records.length===0 ? `<tr><td colspan="8"><div class="empty-state">No payroll records yet.</div></td></tr>` :
+        records.map(p=>`
+          <tr>
+            <td>${periodLabel(p.period)}</td>
+            <td class="tabular">${money(p.basicSalary)}</td>
+            <td class="tabular">${money(p.overtime)}</td>
+            <td class="tabular">${money(p.allowances)}</td>
+            <td class="tabular">${money(p.deductions)}</td>
+            <td class="tabular">${money(p.gross)}</td>
+            <td class="tabular"><strong>${money(p.net)}</strong></td>
+            <td><button class="btn btn-ghost btn-sm" data-view-pr="${p.id}">View Payslip</button></td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ---------------- PAYROLL SETTINGS (Admin) ---------------- */
+function renderSettings(){
+  const s = db.settings;
+  return `
+  <div class="page-head"><div><h2>Payroll Settings</h2><p>Configure company info and statutory rates. Changes apply to newly generated or recalculated payroll records.</p></div></div>
+
+  <div class="panel" style="max-width:760px;">
+    <h3>Company &amp; Schedule</h3>
+    <div class="form-grid">
+      <div class="field span-2"><label>Company Name</label><input id="st-company" type="text" value="${s.companyName}"></div>
+      <div class="field span-2"><label>Company Address</label><input id="st-address" type="text" value="${s.companyAddress}"></div>
+      <div class="field"><label>Daily Working Hours</label><input id="st-dailyhours" type="number" min="1" step="0.5" value="${s.dailyWorkingHours}"></div>
+      <div class="field"><label>Working Days / Year (for rate calc)</label><input id="st-workdays" type="number" min="1" step="1" value="${s.workingDaysPerYear}"></div>
+      <div class="field"><label>Payroll Cutoff</label><input id="st-cutoff" type="text" value="${s.payrollCutoff}"></div>
+      <div class="field"><label>Pay Date</label><input id="st-paydate" type="text" value="${s.payDate}"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width:760px;">
+    <h3>Overtime &amp; Night Differential</h3>
+    <div class="form-grid">
+      <div class="field"><label>Overtime Rate (%, of hourly rate)</label><input id="st-otrate" type="number" min="100" step="1" value="${Math.round(s.otMultiplier*100)}"></div>
+      <div class="field"><label>Night Differential Rate (%, additional)</label><input id="st-nsdrate" type="number" min="0" step="1" value="${Math.round(s.nsdRate*100)}"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width:760px;">
+    <h3>SSS</h3>
+    <div class="form-grid">
+      <div class="field"><label>Employee Share (%)</label><input id="st-sss-ee" type="number" min="0" step="0.1" value="${(s.sss.eeRate*100).toFixed(1)}"></div>
+      <div class="field"><label>Employer Share (%)</label><input id="st-sss-er" type="number" min="0" step="0.1" value="${(s.sss.erRate*100).toFixed(1)}"></div>
+      <div class="field"><label>Minimum MSC (₱)</label><input id="st-sss-floor" type="number" min="0" step="500" value="${s.sss.floorComp}"></div>
+      <div class="field"><label>Maximum MSC (₱)</label><input id="st-sss-ceiling" type="number" min="0" step="500" value="${s.sss.ceilingComp}"></div>
+      <div class="field"><label>MSC Bracket Increment (₱)</label><input id="st-sss-incr" type="number" min="1" step="1" value="${s.sss.increment}"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width:760px;">
+    <h3>PhilHealth</h3>
+    <div class="form-grid">
+      <div class="field"><label>Total Premium Rate (%)</label><input id="st-ph-rate" type="number" min="0" step="0.1" value="${(s.philhealth.rate*100).toFixed(1)}"></div>
+      <div class="field"><label>Employee Share of Premium (%)</label><input id="st-ph-eeshare" type="number" min="0" max="100" step="1" value="${(s.philhealth.eeShare*100).toFixed(0)}"></div>
+      <div class="field"><label>Income Floor (₱)</label><input id="st-ph-floor" type="number" min="0" step="500" value="${s.philhealth.floor}"></div>
+      <div class="field"><label>Income Ceiling (₱)</label><input id="st-ph-ceiling" type="number" min="0" step="500" value="${s.philhealth.ceiling}"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width:760px;">
+    <h3>Pag-IBIG</h3>
+    <div class="form-grid">
+      <div class="field"><label>Employee Rate — comp ≤ threshold (%)</label><input id="st-pi-eelow" type="number" min="0" step="0.1" value="${(s.pagibig.eeRateBelow*100).toFixed(1)}"></div>
+      <div class="field"><label>Employee Rate — comp &gt; threshold (%)</label><input id="st-pi-eehigh" type="number" min="0" step="0.1" value="${(s.pagibig.eeRateAbove*100).toFixed(1)}"></div>
+      <div class="field"><label>Compensation Threshold (₱)</label><input id="st-pi-threshold" type="number" min="0" step="100" value="${s.pagibig.thresholdComp}"></div>
+      <div class="field"><label>Employer Rate (%)</label><input id="st-pi-er" type="number" min="0" step="0.1" value="${(s.pagibig.erRate*100).toFixed(1)}"></div>
+      <div class="field"><label>Contribution Ceiling (₱)</label><input id="st-pi-ceiling" type="number" min="0" step="500" value="${s.pagibig.compCeiling}"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width:760px;">
+    <h3>BIR Withholding Tax Table (Monthly)</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Edit the bracket boundaries, base tax, and rate for each row. Leave the last row's "Over" field blank for no ceiling.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Over (₱)</th><th>Up To (₱)</th><th>Base Tax (₱)</th><th>Rate (%)</th></tr></thead>
+        <tbody id="st-bir-rows">
+          ${s.bir.table.map((r,i)=>`
+          <tr>
+            <td><input class="bir-min" data-i="${i}" type="number" step="1" value="${r.min}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;"></td>
+            <td><input class="bir-max" data-i="${i}" type="number" step="1" value="${r.max===null?'':r.max}" placeholder="no limit" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;"></td>
+            <td><input class="bir-base" data-i="${i}" type="number" step="0.01" value="${r.base}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;"></td>
+            <td><input class="bir-rate" data-i="${i}" type="number" step="0.1" value="${(r.rate*100).toFixed(1)}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:4px;"></td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="display:flex;justify-content:flex-end;gap:10px;max-width:760px;">
+    <button class="btn btn-secondary" id="st-reset">Restore Defaults</button>
+    <button class="btn btn-primary" id="st-save">Save Settings</button>
+  </div>`;
+}
+
+function wireSettingsForm(){
+  const saveBtn = document.getElementById("st-save");
+  if(!saveBtn) return;
+
+  document.getElementById("st-reset").addEventListener("click", () => {
+    openConfirmModal({
+      title:"Restore Default Settings",
+      message:"This resets company info and all statutory rates to their defaults. Continue?",
+      confirmLabel:"Restore Defaults", danger:true,
+      onConfirm: () => { db.settings = defaultSettings(); saveDB(db); toast("Settings restored to defaults."); closeModal(); render(); }
+    });
+  });
+
+  saveBtn.addEventListener("click", () => {
+    const g = id => Number(document.getElementById(id).value)||0;
+    const s = db.settings;
+    s.companyName = document.getElementById("st-company").value.trim() || s.companyName;
+    s.companyAddress = document.getElementById("st-address").value.trim();
+    s.dailyWorkingHours = g("st-dailyhours") || s.dailyWorkingHours;
+    s.workingDaysPerYear = g("st-workdays") || s.workingDaysPerYear;
+    s.payrollCutoff = document.getElementById("st-cutoff").value.trim();
+    s.payDate = document.getElementById("st-paydate").value.trim();
+    s.otMultiplier = g("st-otrate")/100;
+    s.nsdRate = g("st-nsdrate")/100;
+
+    s.sss.eeRate = g("st-sss-ee")/100;
+    s.sss.erRate = g("st-sss-er")/100;
+    s.sss.floorComp = g("st-sss-floor");
+    s.sss.ceilingComp = g("st-sss-ceiling");
+    s.sss.increment = g("st-sss-incr") || 500;
+
+    s.philhealth.rate = g("st-ph-rate")/100;
+    s.philhealth.eeShare = g("st-ph-eeshare")/100;
+    s.philhealth.floor = g("st-ph-floor");
+    s.philhealth.ceiling = g("st-ph-ceiling");
+
+    s.pagibig.eeRateBelow = g("st-pi-eelow")/100;
+    s.pagibig.eeRateAbove = g("st-pi-eehigh")/100;
+    s.pagibig.thresholdComp = g("st-pi-threshold");
+    s.pagibig.erRate = g("st-pi-er")/100;
+    s.pagibig.compCeiling = g("st-pi-ceiling");
+
+    const mins = document.querySelectorAll(".bir-min"), maxs = document.querySelectorAll(".bir-max"),
+          bases = document.querySelectorAll(".bir-base"), rates = document.querySelectorAll(".bir-rate");
+    const table = [];
+    mins.forEach((el,i)=>{
+      const maxVal = maxs[i].value.trim();
+      table.push({
+        min: Number(el.value)||0,
+        max: maxVal==="" ? null : Number(maxVal),
+        base: Number(bases[i].value)||0,
+        rate: (Number(rates[i].value)||0)/100
+      });
+    });
+    s.bir.table = table;
+
+    saveDB(db);
+    toast("Payroll settings saved.");
+    render();
+  });
+}
+
+/* ---------------- PROFILE ---------------- */
+function renderProfile(){
+  const user = state.currentUser;
+  if(user.role === "admin"){
+    return `
+    <div class="page-head"><div><h2>Profile</h2><p>Account details</p></div></div>
+    <div class="panel" style="max-width:480px;">
+      <div class="field"><label>Full Name</label><input type="text" value="${user.fullName}" disabled></div>
+      <div class="field"><label>Username</label><input type="text" value="${user.username}" disabled></div>
+      <div class="field"><label>Role</label><input type="text" value="Administrator" disabled></div>
+    </div>`;
+  }
+  const emp = findEmployee(user.employeeId);
+  return `
+  <div class="page-head"><div><h2>Profile</h2><p>Your employee information</p></div></div>
+  <div class="panel" style="max-width:480px;">
+    <div class="form-grid">
+      <div class="field span-2"><label>Full Name</label><input type="text" value="${emp.fullName}" disabled></div>
+      <div class="field"><label>Employee ID</label><input type="text" value="${emp.id}" disabled></div>
+      <div class="field"><label>Status</label><input type="text" value="${emp.status}" disabled></div>
+      <div class="field"><label>Position</label><input type="text" value="${emp.position}" disabled></div>
+      <div class="field"><label>Department</label><input type="text" value="${emp.department}" disabled></div>
+      <div class="field span-2"><label>Email</label><input type="text" value="${emp.email}" disabled></div>
+    </div>
+  </div>`;
+}
+
+/* ============================================================
+   MODAL SYSTEM
+============================================================ */
+let currentModalConfirm = null;
+
+function openModal({title, bodyHtml, confirmLabel, onConfirm, danger}){
+  const backdrop = document.getElementById("modal-backdrop");
+  const inner = document.getElementById("modal-inner");
+  currentModalConfirm = onConfirm || null;
+  inner.innerHTML = `
+    <div class="modal-head">
+      <h3>${title}</h3>
+      <button class="modal-close" id="modal-close-btn">&times;</button>
+    </div>
+    <div class="modal-body">${bodyHtml}</div>
+    ${confirmLabel ? `
+    <div class="modal-foot">
+      <button class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+      <button class="btn ${danger?'btn-danger':'btn-primary'}" id="modal-confirm-btn">${confirmLabel}</button>
+    </div>` : `<div class="modal-foot"><button class="btn btn-secondary" id="modal-cancel-btn">Close</button></div>`}
+  `;
+  backdrop.classList.add("show");
+  document.getElementById("modal-close-btn").addEventListener("click", closeModal);
+  document.getElementById("modal-cancel-btn").addEventListener("click", closeModal);
+  const confirmBtn = document.getElementById("modal-confirm-btn");
+  if(confirmBtn) confirmBtn.addEventListener("click", () => { if(currentModalConfirm) currentModalConfirm(); });
+
+  if(state.view === "employees" || document.getElementById("f-id")){
+    // employee modal open — nothing extra needed, form is static
+  }
+}
+
+function openConfirmModal({title, message, confirmLabel, danger, onConfirm}){
+  openModal({
+    title, bodyHtml: `<p style="color:var(--ink-soft);">${message}</p>`,
+    confirmLabel: confirmLabel || "Confirm", danger, onConfirm
+  });
+}
+
+function closeModal(){
+  document.getElementById("modal-backdrop").classList.remove("show");
+  currentModalConfirm = null;
+}
+
+/* ============================================================
+   EVENT WIRING
+============================================================ */
+function wireShellEvents(){
+  document.getElementById("logout-btn").addEventListener("click", logout);
+  document.getElementById("overlay").addEventListener("click", () => { state.sidebarOpen=false; render(); });
+
+  const hamburger = document.getElementById("hamburger");
+  if(hamburger) hamburger.addEventListener("click", () => { state.sidebarOpen = !state.sidebarOpen; render(); });
+
+  document.querySelectorAll("[data-nav]").forEach(el=>{
+    el.addEventListener("click", (e)=>{ e.preventDefault(); navigate(el.getAttribute("data-nav")); });
+  });
+
+  // Employees page
+  const addBtn = document.getElementById("add-employee-btn");
+  if(addBtn) addBtn.addEventListener("click", () => openEmployeeModal(null));
+
+  const search = document.getElementById("employee-search");
+  if(search){
+    search.addEventListener("input", (e)=>{ state.employeeSearch = e.target.value; render(); });
+    // restore focus/cursor after re-render
+    search.focus();
+    search.selectionStart = search.selectionEnd = search.value.length;
+  }
+
+  document.querySelectorAll("[data-edit-emp]").forEach(el=>{
+    el.addEventListener("click", ()=> openEmployeeModal(el.getAttribute("data-edit-emp")));
+  });
+  document.querySelectorAll("[data-del-emp]").forEach(el=>{
+    el.addEventListener("click", ()=> confirmDeleteEmployee(el.getAttribute("data-del-emp")));
+  });
+
+  // Payroll create page
+  wirePayrollCreate();
+
+  // Payroll history
+  const histEmp = document.getElementById("hist-emp-filter");
+  if(histEmp) histEmp.addEventListener("change", (e)=>{ state.historyFilterEmp = e.target.value; render(); });
+  const histPeriod = document.getElementById("hist-period-filter");
+  if(histPeriod) histPeriod.addEventListener("change", (e)=>{ state.historyFilterPeriod = e.target.value; render(); });
+  const printHistBtn = document.getElementById("print-history-btn");
+  if(printHistBtn) printHistBtn.addEventListener("click", printPayrollHistory);
+
+  document.querySelectorAll("[data-print-pr]").forEach(el=>{
+    el.addEventListener("click", ()=> printPayslip(el.getAttribute("data-print-pr")));
+  });
+
+  document.querySelectorAll("[data-view-pr]").forEach(el=>{
+    el.addEventListener("click", ()=> openViewPayroll(el.getAttribute("data-view-pr")));
+  });
+  document.querySelectorAll("[data-edit-pr]").forEach(el=>{
+    el.addEventListener("click", ()=> openEditPayroll(el.getAttribute("data-edit-pr")));
+  });
+  document.querySelectorAll("[data-del-pr]").forEach(el=>{
+    el.addEventListener("click", ()=> confirmDeletePayroll(el.getAttribute("data-del-pr")));
+  });
+  document.querySelectorAll("[data-recalc-pr]").forEach(el=>{
+    el.addEventListener("click", ()=> recalculatePayroll(el.getAttribute("data-recalc-pr")));
+  });
+
+  // Settings page
+  wireSettingsForm();
+}
+
+/* ============================================================
+   INIT
+============================================================ */
+render();
+</script>
+</body>
+</html>
