@@ -131,7 +131,10 @@
   th{text-align:left;font-size:11.5px;color:var(--ink-soft);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--border);white-space:nowrap;}
   td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
   tr:last-child td{border-bottom:none;}
-  .table-wrap{overflow-x:auto;}
+  .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .table-wrap.swipeable{cursor:grab;}
+  .table-wrap.swipeable.dragging{cursor:grabbing;}
+  .table-wrap.dragging, .table-wrap.dragging *{user-select:none;}
   .row-actions{display:flex;gap:6px;justify-content:flex-end;}
   .status-pill{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;display:inline-block;}
   .status-active{background:var(--accent-soft);color:var(--accent-ink);}
@@ -1793,6 +1796,53 @@ function wireShellEvents(){
 
   // Settings page
   wireSettingsForm();
+
+  // Cursor-swipeable tables (drag-to-scroll for anything that overflows horizontally)
+  enableDragScroll();
+}
+
+/* ---------------- DRAG-TO-SCROLL (cursor swipe) ---------------- */
+function enableDragScroll(){
+  document.querySelectorAll(".table-wrap").forEach(wrap=>{
+    const refreshSwipeable = () => {
+      if(wrap.scrollWidth > wrap.clientWidth + 1) wrap.classList.add("swipeable");
+      else wrap.classList.remove("swipeable");
+    };
+    refreshSwipeable();
+    window.addEventListener("resize", refreshSwipeable);
+
+    let isDown = false, startX = 0, startScroll = 0, moved = false;
+
+    wrap.addEventListener("mousedown", (e)=>{
+      if(!wrap.classList.contains("swipeable")) return;
+      isDown = true; moved = false;
+      wrap.classList.add("dragging");
+      startX = e.pageX;
+      startScroll = wrap.scrollLeft;
+    });
+
+    const endDrag = () => {
+      if(!isDown) return;
+      isDown = false;
+      wrap.classList.remove("dragging");
+    };
+    wrap.addEventListener("mouseleave", endDrag);
+    wrap.addEventListener("mouseup", endDrag);
+    window.addEventListener("mouseup", endDrag);
+
+    wrap.addEventListener("mousemove", (e)=>{
+      if(!isDown) return;
+      e.preventDefault();
+      const delta = e.pageX - startX;
+      if(Math.abs(delta) > 3) moved = true;
+      wrap.scrollLeft = startScroll - delta;
+    });
+
+    // Swallow the click that follows a drag so row buttons/links don't fire accidentally
+    wrap.addEventListener("click", (e)=>{
+      if(moved){ e.stopPropagation(); e.preventDefault(); moved = false; }
+    }, true);
+  });
 }
 
 /* ============================================================
