@@ -175,6 +175,20 @@
   .payslip-row:last-child{border-bottom:none;}
   .payslip-row.net{background:var(--accent-soft);color:var(--accent-ink);font-weight:700;font-size:15px;}
 
+  /* ---------- Holiday badges / entries ---------- */
+  .holiday-badge{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;display:inline-block;white-space:nowrap;}
+  .holiday-badge-regular{background:var(--c-blue-soft);color:var(--c-blue);}
+  .holiday-badge-special_non_working{background:var(--c-amber-soft);color:var(--c-amber);}
+  .holiday-badge-special_working{background:var(--c-plum-soft);color:var(--c-plum);}
+  .holiday-entry-row{border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px;background:var(--bg);}
+  .holiday-entry-row .form-grid{grid-template-columns:1.4fr 0.9fr 0.9fr 1.1fr 0.6fr;align-items:end;margin-bottom:0;}
+  .holiday-entry-row .field{margin-bottom:0;}
+  @media (max-width:860px){ .holiday-entry-row .form-grid{grid-template-columns:1fr 1fr;} }
+  .holiday-entries-empty{color:var(--ink-soft);font-size:13px;padding:10px 2px;}
+  .holiday-mini-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+  .holiday-mini-table th{text-align:left;font-size:10.5px;color:var(--ink-soft);padding:6px 8px;border-bottom:1px solid var(--border);}
+  .holiday-mini-table td{padding:7px 8px;border-bottom:1px solid var(--border);}
+
   @media (max-width: 860px){
     .sidebar{transform:translateX(-100%);}
     .sidebar.open{transform:translateX(0);}
@@ -215,7 +229,23 @@ function defaultSettings(){
       {min:66667,   max:166667, base:8541.80,  rate:0.25},
       {min:166667,  max:666667, base:33541.80, rate:0.30},
       {min:666667,  max:null,   base:183541.80,rate:0.35}
-    ]}
+    ]},
+    holidayRates: defaultHolidayRates()
+  };
+}
+
+// Minimum statutory Philippine holiday-pay multipliers (DOLE Labor Advisory / Presidential
+// Proclamation basis). Admin-editable from the Holiday Management page so rates can be updated
+// without touching source code if labor regulations change.
+function defaultHolidayRates(){
+  return {
+    regularWorked: 2.00,           // Regular Holiday, worked: 200% of daily basic wage
+    regularRestDayWorked: 2.60,    // Regular Holiday + Rest Day, worked: 200% x 130%
+    regularOtMultiplier: 1.30,     // Regular Holiday OT: holiday hourly rate x 130%
+    specialWorked: 1.30,           // Special Non-Working Day, worked: 130%
+    specialRestDayWorked: 1.50,    // Special Non-Working Day + Rest Day, worked: 150%
+    specialOtMultiplier: 1.30,     // Special Non-Working Day OT: holiday hourly rate x 130%
+    specialWorkingWorked: 1.00     // Special Working Day: normal wage, no premium
   };
 }
 
@@ -272,8 +302,124 @@ function seedData(){
     admin: {username:"admin", password:"Admin123", fullName:"System Administrator"},
     employees,
     payrolls,
-    settings
+    settings,
+    holidays: seedHolidays()
   };
+}
+
+/* ============================================================
+   PHILIPPINE HOLIDAY SEED DATA (2026)
+   Basis: Proclamation No. 1006, s. 2025 (regular holidays & special non-working
+   days for 2026), RA 9256 (Ninoy Aquino Day), RA 9849 (Eid'l Fitr / Eid'l Adha).
+   Admins can add, edit, deactivate, or delete any of these from Holiday Management —
+   nothing here is hard-coded into the payroll calculation itself.
+============================================================ */
+function seedHolidays(){
+  let hid = 1;
+  const H = (name, date, type, description, source, recurring) => ({
+    id: "HOL" + String(hid++).padStart(3,"0"),
+    name, date, year: Number(date.slice(0,4)), type, status: "Active",
+    description, source, recurring, createdBy: "admin", updatedBy: "admin"
+  });
+  return [
+    H("New Year's Day", "2026-01-01", "regular", "Start of the calendar year.", "Proclamation No. 1006, s. 2025", true),
+    H("Eid'l Fitr", "2026-03-20", "regular", "Feast of Ramadhan. Exact date confirmed by a separate NCMF-recommended proclamation each year.", "RA 9849 — date subject to official proclamation", false),
+    H("Maundy Thursday", "2026-04-02", "regular", "Holy Week observance.", "Proclamation No. 1006, s. 2025", false),
+    H("Good Friday", "2026-04-03", "regular", "Holy Week observance.", "Proclamation No. 1006, s. 2025", false),
+    H("Araw ng Kagitingan", "2026-04-09", "regular", "Day of Valor — fall of Bataan.", "Proclamation No. 1006, s. 2025", true),
+    H("Labor Day", "2026-05-01", "regular", "International Workers' Day.", "Proclamation No. 1006, s. 2025", true),
+    H("Eid'l Adha", "2026-05-27", "regular", "Feast of Sacrifice. Exact date confirmed by a separate NCMF-recommended proclamation each year.", "RA 9849 — date subject to official proclamation", false),
+    H("Independence Day", "2026-06-12", "regular", "Philippine Independence Day.", "Proclamation No. 1006, s. 2025", true),
+    H("National Heroes Day", "2026-08-31", "regular", "Last Monday of August.", "Proclamation No. 1006, s. 2025", true),
+    H("Bonifacio Day", "2026-11-30", "regular", "Birth anniversary of Andres Bonifacio.", "Proclamation No. 1006, s. 2025", true),
+    H("Christmas Day", "2026-12-25", "regular", "", "Proclamation No. 1006, s. 2025", true),
+    H("Rizal Day", "2026-12-30", "regular", "Death anniversary of Dr. Jose Rizal.", "Proclamation No. 1006, s. 2025", true),
+
+    H("Chinese New Year", "2026-02-17", "special_non_working", "", "Proclamation No. 1006, s. 2025", false),
+    H("Black Saturday", "2026-04-04", "special_non_working", "Day after Good Friday, Holy Week.", "Proclamation No. 1006, s. 2025", true),
+    H("Ninoy Aquino Day", "2026-08-21", "special_non_working", "Death anniversary of Sen. Benigno S. Aquino Jr.", "RA 9256", true),
+    H("All Saints' Day", "2026-11-01", "special_non_working", "", "Proclamation No. 1006, s. 2025", true),
+    H("All Souls' Day", "2026-11-02", "special_non_working", "Added to extend the Undas long weekend.", "Proclamation No. 1006, s. 2025", false),
+    H("Feast of the Immaculate Conception of Mary", "2026-12-08", "special_non_working", "", "Proclamation No. 1006, s. 2025", true),
+    H("Christmas Eve", "2026-12-24", "special_non_working", "", "Proclamation No. 1006, s. 2025", false),
+    H("Last Day of the Year", "2026-12-31", "special_non_working", "", "Proclamation No. 1006, s. 2025", true),
+
+    H("EDSA People Power Revolution Anniversary", "2026-02-25", "special_working", "Commemorative special working day — normal work, no holiday premium.", "Proclamation No. 1006, s. 2025", false)
+  ];
+}
+
+function findHoliday(id){ return (db.holidays||[]).find(h=>h.id===id); }
+function holidayTypeLabel(type){
+  return type==="regular" ? "Regular Holiday" : type==="special_non_working" ? "Special Non-Working Day" : "Special Working Day";
+}
+// Active holidays whose date falls inside the given payroll period (monthly or bi-weekly).
+function holidaysInPeriod(period){
+  if(!period) return [];
+  const range = periodRange(period);
+  return (db.holidays||[])
+    .filter(h => h.status === "Active")
+    .filter(h => { const d = parseISODate(h.date); return d >= range.start && d <= range.end; })
+    .sort((a,b)=> parseISODate(a.date) - parseISODate(b.date));
+}
+
+/* ---------------- HOLIDAY PAY COMPUTATION (DOLE minimum statutory rates) ---------------- */
+// entry: {holidayId, hoursWorked, otHours, isRestDay}
+function computeHolidayEntry(entry, holiday, hourlyRate, dailyWorkingHours, rates){
+  rates = rates || defaultHolidayRates();
+  const hoursWorked = Math.max(0, Number(entry.hoursWorked)||0);
+  const otHours = Math.max(0, Number(entry.otHours)||0);
+  const isRestDay = !!entry.isRestDay;
+  const type = holiday.type;
+
+  if(type === "special_working"){
+    // Normal basic wage, no special-day premium. Overtime (if any) follows normal OT rules
+    // and is already captured by the payroll's regular Overtime Hours field.
+    return { holiday, hoursWorked, otHours, isRestDay, rate: 1.00, basicAmt: 0, restPremiumAmt: 0, otAmt: 0, total: 0,
+      note: "Special working day — employee's normal daily wage applies; no holiday premium. Log any overtime in the regular Overtime Hours field." };
+  }
+  if(hoursWorked <= 0){
+    if(type === "regular"){
+      return { holiday, hoursWorked, otHours, isRestDay, rate: 1.00, basicAmt: 0, restPremiumAmt: 0, otAmt: 0, total: 0,
+        note: "Not worked — 100% regular holiday pay is already included in the employee's basic salary for the period." };
+    }
+    return { holiday, hoursWorked, otHours, isRestDay, rate: 0, basicAmt: 0, restPremiumAmt: 0, otAmt: 0, total: 0,
+      note: "Not worked — \"no work, no pay\" applies to special non-working days unless company policy states otherwise." };
+  }
+
+  const cappedHours = Math.min(hoursWorked, dailyWorkingHours);
+  const baseMultiplier = type === "regular" ? rates.regularWorked : rates.specialWorked;
+  const restMultiplier = type === "regular" ? rates.regularRestDayWorked : rates.specialRestDayWorked;
+  const otTypeMultiplier = type === "regular" ? rates.regularOtMultiplier : rates.specialOtMultiplier;
+  const effMultiplier = isRestDay ? restMultiplier : baseMultiplier;
+
+  const basicAmt = round2(hourlyRate * cappedHours * baseMultiplier);
+  const restPremiumAmt = isRestDay ? round2(hourlyRate * cappedHours * (restMultiplier - baseMultiplier)) : 0;
+  const otAmt = round2(hourlyRate * otHours * effMultiplier * otTypeMultiplier);
+  const total = round2(basicAmt + restPremiumAmt + otAmt);
+
+  return { holiday, hoursWorked, otHours, isRestDay, rate: effMultiplier, basicAmt, restPremiumAmt, otAmt, total, note: null };
+}
+
+function computeHolidayEntriesTotal(entries, hourlyRate, dailyWorkingHours, rates){
+  const details = (entries||[]).map(e=>{
+    const h = findHoliday(e.holidayId);
+    return h ? computeHolidayEntry(e, h, hourlyRate, dailyWorkingHours, rates) : null;
+  }).filter(Boolean);
+
+  let regularHolidayPay=0, specialHolidayPay=0, holidayRestDayPremium=0, holidayOvertimePay=0;
+  details.forEach(d=>{
+    if(d.holiday.type==="regular") regularHolidayPay += d.basicAmt;
+    else if(d.holiday.type==="special_non_working") specialHolidayPay += d.basicAmt;
+    holidayRestDayPremium += d.restPremiumAmt;
+    holidayOvertimePay += d.otAmt;
+  });
+  regularHolidayPay = round2(regularHolidayPay);
+  specialHolidayPay = round2(specialHolidayPay);
+  holidayRestDayPremium = round2(holidayRestDayPremium);
+  holidayOvertimePay = round2(holidayOvertimePay);
+  const total = round2(regularHolidayPay + specialHolidayPay + holidayRestDayPremium + holidayOvertimePay);
+
+  return { details, regularHolidayPay, specialHolidayPay, holidayRestDayPremium, holidayOvertimePay, total };
 }
 
 /* ============================================================
@@ -339,7 +485,20 @@ function computePayrollRecord(emp, period, inputs, settings, payFrequency){
   const nsdPay = round2(hourlyRate * nsdHours * nsdRate);
 
   const allowances = Number(inputs.allowances)||0;
-  const holidayPay = Number(inputs.holidayPay)||0;
+  // Philippine holiday pay: computed automatically from any holiday work entries the admin added
+  // (see computeHolidayEntriesTotal). Falls back to a plain manual figure for older records / inputs
+  // that don't carry structured entries, so nothing already saved is lost.
+  const holidayEntries = Array.isArray(inputs.holidayEntries) ? inputs.holidayEntries.filter(e=>e && e.holidayId) : [];
+  let holidayPay, regularHolidayPay = 0, specialHolidayPay = 0, holidayRestDayPremium = 0, holidayOvertimePay = 0, holidayBreakdown = [];
+  if(holidayEntries.length){
+    const hc = computeHolidayEntriesTotal(holidayEntries, hourlyRate, settings.dailyWorkingHours, settings.holidayRates || defaultHolidayRates());
+    holidayPay = hc.total;
+    regularHolidayPay = hc.regularHolidayPay; specialHolidayPay = hc.specialHolidayPay;
+    holidayRestDayPremium = hc.holidayRestDayPremium; holidayOvertimePay = hc.holidayOvertimePay;
+    holidayBreakdown = hc.details;
+  } else {
+    holidayPay = Number(inputs.holidayPay)||0;
+  }
   const bonuses = Number(inputs.bonuses)||0;
   const incentives = Number(inputs.incentives)||0;
   const otherEarnings = Number(inputs.otherEarnings)||0;
@@ -383,6 +542,7 @@ function computePayrollRecord(emp, period, inputs, settings, payFrequency){
     regularHoursWorked, otHours, otMultiplier, otPay,
     nsdHours, nsdRate, nsdPay,
     basicSalary: basicPay, allowances, holidayPay, bonuses, incentives, otherEarnings,
+    holidayEntries, holidayBreakdown, regularHolidayPay, specialHolidayPay, holidayRestDayPremium, holidayOvertimePay,
     gross: grossPay,
     sss, philhealth, pagibig, withholdingTax,
     salaryLoan, cashAdvance, absences, tardiness, undertime, companyLoan, otherDeductions, otherDeductTotal,
@@ -399,6 +559,8 @@ function loadDB(){
     if(raw){
       const parsed = JSON.parse(raw);
       if(!parsed.settings) parsed.settings = defaultSettings();
+      if(!parsed.settings.holidayRates) parsed.settings.holidayRates = defaultHolidayRates();
+      if(!Array.isArray(parsed.holidays)) parsed.holidays = seedHolidays();
       return parsed;
     }
   }catch(e){}
@@ -424,7 +586,12 @@ const state = {
   historyFilterEmp: "",
   historyFilterPeriod: "",
   editingEmployeeId: null,
-  editingPayrollId: null
+  editingPayrollId: null,
+  holidaySearch: "",
+  holidayTypeFilter: "",
+  editingHolidayId: null,
+  prHolidayEntries: [],   // {holidayId, hoursWorked, otHours, isRestDay} — Generate Payroll form
+  epHolidayEntries: []    // same shape — Edit Payroll modal
 };
 
 function money(n){
@@ -648,6 +815,7 @@ function navItemsFor(role){
       {v:"employees", label:"Employees"},
       {v:"payroll", label:"Payroll"},
       {v:"payrollHistory", label:"Payroll History"},
+      {v:"holidays", label:"Holidays"},
       {v:"settings", label:"Payroll Settings"},
       {v:"profile", label:"Profile"}
     ];
@@ -664,7 +832,7 @@ function renderShell(){
   const items = navItemsFor(user.role);
   const pageTitleMap = {
     adminDashboard:"Dashboard", employeeDashboard:"Dashboard", employees:"Employees",
-    payroll:"Payroll", payrollHistory:"Payroll History", myPayroll:"My Payroll", profile:"Profile"
+    payroll:"Payroll", payrollHistory:"Payroll History", holidays:"Holiday Management", myPayroll:"My Payroll", profile:"Profile"
   };
 
   return `
@@ -716,6 +884,7 @@ function renderPage(view){
     case "employees": return renderEmployees();
     case "payroll": return renderPayrollCreate();
     case "payrollHistory": return renderPayrollHistory();
+    case "holidays": return renderHolidayManagement();
     case "settings": return renderSettings();
     case "employeeDashboard": return renderEmployeeDashboard();
     case "myPayroll": return renderMyPayroll();
@@ -983,8 +1152,285 @@ function confirmDeleteEmployee(id){
   });
 }
 
+/* ---------------- HOLIDAY MANAGEMENT ---------------- */
+function getFilteredHolidays(){
+  const q = state.holidaySearch.trim().toLowerCase();
+  return (db.holidays||[])
+    .filter(h => !state.holidayTypeFilter || h.type === state.holidayTypeFilter)
+    .filter(h => !q || h.name.toLowerCase().includes(q) || (h.source||"").toLowerCase().includes(q))
+    .sort((a,b)=> parseISODate(a.date) - parseISODate(b.date));
+}
+
+function renderHolidayManagement(){
+  const list = getFilteredHolidays();
+  return `
+  <div class="page-head">
+    <div><h2>Holiday Management</h2><p>Maintain the Philippine regular holidays, special non-working days, and special working days used to compute holiday pay. Rates are configured on the Payroll Settings page.</p></div>
+    <button class="btn btn-primary" id="add-holiday-btn">Add Holiday</button>
+  </div>
+  <div class="toolbar">
+    <div class="filters">
+      <input type="text" id="holiday-search" placeholder="Search by name or legal basis..." value="${state.holidaySearch}">
+      <select id="holiday-type-filter">
+        <option value="">All Types</option>
+        <option value="regular" ${state.holidayTypeFilter==="regular"?"selected":""}>Regular Holiday</option>
+        <option value="special_non_working" ${state.holidayTypeFilter==="special_non_working"?"selected":""}>Special Non-Working Day</option>
+        <option value="special_working" ${state.holidayTypeFilter==="special_working"?"selected":""}>Special Working Day</option>
+      </select>
+    </div>
+  </div>
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Holiday</th><th>Date</th><th>Type</th><th>Status</th><th>Recurring</th><th>Legal Basis</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${list.length===0 ? `<tr><td colspan="7"><div class="empty-state">No holidays match this filter.</div></td></tr>` :
+        list.map(h=>{
+          const d = parseISODate(h.date);
+          return `<tr>
+            <td><strong>${h.name}</strong>${h.description?`<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">${h.description}</div>`:""}</td>
+            <td class="tabular">${d.toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric"})}</td>
+            <td><span class="holiday-badge holiday-badge-${h.type}">${holidayTypeLabel(h.type)}</span></td>
+            <td><span class="status-pill ${h.status==="Active"?"status-active":"status-inactive"}">${h.status}</span></td>
+            <td>${h.recurring?"Yes":"No"}</td>
+            <td style="font-size:12px;color:var(--ink-soft);">${h.source||""}</td>
+            <td>
+              <div class="row-actions">
+                <button class="btn btn-ghost btn-sm" data-edit-hol="${h.id}">Edit</button>
+                <button class="btn btn-ghost btn-sm" data-toggle-hol="${h.id}">${h.status==="Active"?"Deactivate":"Activate"}</button>
+                <button class="btn btn-ghost btn-sm" data-del-hol="${h.id}" style="color:var(--danger);">Delete</button>
+              </div>
+            </td>
+          </tr>`;
+        }).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function holidayFormHtml(h){
+  const e = h || {name:"", date:"2026-01-01", type:"regular", status:"Active", description:"", source:"", recurring:false};
+  return `
+  <div class="form-grid">
+    <div class="field span-2"><label>Holiday Name</label><input id="hf-name" type="text" value="${e.name}" required placeholder="e.g. Araw ng Kagitingan"></div>
+    <div class="field"><label>Date</label><input id="hf-date" type="date" value="${e.date}" required></div>
+    <div class="field"><label>Holiday Type</label>
+      <select id="hf-type">
+        <option value="regular" ${e.type==="regular"?"selected":""}>Regular Holiday</option>
+        <option value="special_non_working" ${e.type==="special_non_working"?"selected":""}>Special Non-Working Day</option>
+        <option value="special_working" ${e.type==="special_working"?"selected":""}>Special Working Day</option>
+      </select>
+    </div>
+    <div class="field"><label>Status</label>
+      <select id="hf-status">
+        <option value="Active" ${e.status==="Active"?"selected":""}>Active</option>
+        <option value="Inactive" ${e.status==="Inactive"?"selected":""}>Inactive</option>
+      </select>
+    </div>
+    <div class="field"><label>Automatically Recurring</label>
+      <select id="hf-recurring">
+        <option value="yes" ${e.recurring?"selected":""}>Yes — same date every year</option>
+        <option value="no" ${!e.recurring?"selected":""}>No — declared per year</option>
+      </select>
+    </div>
+    <div class="field span-2"><label>Source / Legal Basis</label><input id="hf-source" type="text" value="${e.source||""}" placeholder="e.g. Proclamation No. 1006, s. 2025"></div>
+    <div class="field span-2"><label>Description</label><textarea id="hf-description" rows="2" style="resize:vertical;">${e.description||""}</textarea></div>
+  </div>
+  ${h ? `<div style="font-size:11.5px;color:var(--ink-faint);margin-top:2px;">Created by ${h.createdBy||"—"}${h.updatedBy && h.updatedBy!==h.createdBy ? `, last updated by ${h.updatedBy}`:""}</div>` : ""}`;
+}
+
+function openHolidayModal(holId){
+  const h = holId ? findHoliday(holId) : null;
+  state.editingHolidayId = holId || null;
+  openModal({
+    title: h ? "Edit Holiday" : "Add Holiday",
+    bodyHtml: holidayFormHtml(h),
+    confirmLabel: h ? "Save Changes" : "Add Holiday",
+    onConfirm: () => saveHolidayForm(h)
+  });
+}
+
+function saveHolidayForm(existing){
+  const name = document.getElementById("hf-name").value.trim();
+  const date = document.getElementById("hf-date").value;
+  const type = document.getElementById("hf-type").value;
+  const status = document.getElementById("hf-status").value;
+  const recurring = document.getElementById("hf-recurring").value === "yes";
+  const source = document.getElementById("hf-source").value.trim();
+  const description = document.getElementById("hf-description").value.trim();
+
+  if(!name || !date){
+    toast("Please enter a holiday name and date.", "error");
+    return;
+  }
+  const who = (state.currentUser && state.currentUser.username) || "admin";
+  if(!db.holidays) db.holidays = [];
+
+  if(existing){
+    const idx = db.holidays.findIndex(x=>x.id===existing.id);
+    db.holidays[idx] = { ...existing, name, date, year: Number(date.slice(0,4)), type, status, recurring, source, description, updatedBy: who };
+    toast("Holiday updated.");
+  }else{
+    const newId = "HOL" + String(db.holidays.length+1).padStart(3,"0") + Math.floor(Math.random()*90+10);
+    db.holidays.push({ id:newId, name, date, year:Number(date.slice(0,4)), type, status, recurring, source, description, createdBy: who, updatedBy: who });
+    toast("Holiday added.");
+  }
+  saveDB(db);
+  closeModal();
+  render();
+}
+
+function confirmDeleteHoliday(id){
+  const h = findHoliday(id);
+  openConfirmModal({
+    title:"Delete Holiday",
+    message: `Delete "${h.name}" (${h.date})? Existing payroll records already generated keep their computed holiday pay — this only removes the holiday from future payroll runs. This cannot be undone.`,
+    confirmLabel:"Delete",
+    danger:true,
+    onConfirm: () => {
+      db.holidays = db.holidays.filter(x=>x.id!==id);
+      saveDB(db);
+      toast("Holiday deleted.");
+      closeModal();
+      render();
+    }
+  });
+}
+
+function toggleHolidayStatus(id){
+  const h = findHoliday(id);
+  if(!h) return;
+  h.status = h.status === "Active" ? "Inactive" : "Active";
+  h.updatedBy = (state.currentUser && state.currentUser.username) || "admin";
+  saveDB(db);
+  toast(`Holiday marked ${h.status}.`);
+  render();
+}
+
+/* ---------------- HOLIDAY PAY ENTRY WIDGET (shared: Generate Payroll + Edit Payroll) ---------------- */
+function holidayOptionsHtml(period, selectedId){
+  const list = holidaysInPeriod(period);
+  if(list.length===0) return `<option value="">No active holidays in this period</option>`;
+  return `<option value="">Select holiday…</option>` + list.map(h=>
+    `<option value="${h.id}" ${h.id===selectedId?"selected":""}>${h.name} — ${h.date} (${holidayTypeLabel(h.type)})</option>`
+  ).join("");
+}
+
+function holidayEntryCalcHtml(calc){
+  const h = calc.holiday;
+  if(calc.note){
+    return `<div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">${calc.note}</div>`;
+  }
+  return `<div style="font-size:12px;color:var(--ink-soft);margin-top:8px;display:grid;gap:2px;">
+    <div>Applicable rate: ${Math.round(calc.rate*100)}%${calc.isRestDay?" (includes rest-day premium)":""}</div>
+    <div>Base holiday pay: <span class="tabular">${money(calc.basicAmt)}</span>${calc.restPremiumAmt?` · Rest day premium: <span class="tabular">${money(calc.restPremiumAmt)}</span>`:""}${calc.otAmt?` · Holiday OT: <span class="tabular">${money(calc.otAmt)}</span>`:""}</div>
+    <div style="font-weight:600;color:var(--ink);">Entry total: <span class="tabular">${money(calc.total)}</span></div>
+  </div>`;
+}
+
+function holidayEntriesBlockHtml(prefix, entries, period, hourlyRate){
+  const rates = db.settings.holidayRates || defaultHolidayRates();
+  if(!entries.length){
+    return `<div class="holiday-entries-empty">No holiday entries added for this period. Click "Add Holiday" below if this payroll period covers a Philippine holiday.</div>
+      <button type="button" class="btn btn-secondary btn-sm ${prefix}-hol-add" style="margin-top:8px;">+ Add Holiday</button>`;
+  }
+  const rows = entries.map((entry, idx)=>{
+    const h = findHoliday(entry.holidayId);
+    const calc = h ? computeHolidayEntry(entry, h, hourlyRate, db.settings.dailyWorkingHours, rates) : null;
+    return `
+    <div class="holiday-entry-row">
+      <div class="form-grid">
+        <div class="field"><label>Holiday</label>
+          <select class="${prefix}-hol-select" data-hol-idx="${idx}">${holidayOptionsHtml(period, entry.holidayId)}</select>
+        </div>
+        <div class="field"><label>Hours Worked</label>
+          <input class="${prefix}-hol-hours" data-hol-idx="${idx}" type="number" min="0" max="24" step="0.5" value="${entry.hoursWorked}">
+        </div>
+        <div class="field"><label>Holiday OT Hours</label>
+          <input class="${prefix}-hol-ot" data-hol-idx="${idx}" type="number" min="0" step="0.5" value="${entry.otHours}">
+        </div>
+        <div class="field"><label style="display:flex;align-items:center;gap:6px;font-weight:400;color:var(--ink);">
+          <input class="${prefix}-hol-rest" data-hol-idx="${idx}" type="checkbox" ${entry.isRestDay?"checked":""}> Also employee's rest day</label>
+        </div>
+        <div class="field"><button type="button" class="btn btn-ghost btn-sm ${prefix}-hol-remove" data-hol-idx="${idx}" style="color:var(--danger);">Remove</button></div>
+      </div>
+      <div id="${prefix}-hol-calc-${idx}">${calc ? holidayEntryCalcHtml(calc) : `<div style="font-size:12px;color:var(--ink-faint);margin-top:8px;">Select a holiday to compute pay.</div>`}</div>
+    </div>`;
+  }).join("");
+  return rows + `<button type="button" class="btn btn-secondary btn-sm ${prefix}-hol-add" style="margin-top:4px;">+ Add Another Holiday</button>`;
+}
+
+// Attaches interactivity to a rendered holiday-entries container and keeps it in sync with `entries`.
+// getEmp()/getPeriod() are called fresh each time so the block stays correct as the surrounding form changes.
+function wireHolidayEntriesBlock(prefix, entries, getEmp, getPeriod, containerId, onRecompute){
+  const container = document.getElementById(containerId);
+  if(!container) return null;
+
+  function hourlyRateFor(emp){
+    if(!emp) return 0;
+    const dailyRate = round2((Number(emp.basicSalary)||0) * 12 / db.settings.workingDaysPerYear);
+    return round2(dailyRate / db.settings.dailyWorkingHours);
+  }
+
+  function refresh(){
+    const period = getPeriod();
+    const hourlyRate = hourlyRateFor(getEmp());
+    container.innerHTML = holidayEntriesBlockHtml(prefix, entries, period, hourlyRate);
+    wireRows();
+    if(onRecompute) onRecompute();
+  }
+
+  function wireRows(){
+    const addBtn = container.querySelector(`.${prefix}-hol-add`);
+    if(addBtn) addBtn.addEventListener("click", ()=>{
+      const avail = holidaysInPeriod(getPeriod());
+      entries.push({ holidayId: avail[0] ? avail[0].id : "", hoursWorked: 8, otHours: 0, isRestDay: false });
+      refresh();
+    });
+    container.querySelectorAll(`.${prefix}-hol-remove`).forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        entries.splice(Number(btn.getAttribute("data-hol-idx")), 1);
+        refresh();
+      });
+    });
+    container.querySelectorAll(`.${prefix}-hol-select`).forEach(sel=>{
+      sel.addEventListener("change", ()=>{
+        entries[Number(sel.getAttribute("data-hol-idx"))].holidayId = sel.value;
+        refresh();
+      });
+    });
+    container.querySelectorAll(`.${prefix}-hol-rest`).forEach(cb=>{
+      cb.addEventListener("change", ()=>{
+        entries[Number(cb.getAttribute("data-hol-idx"))].isRestDay = cb.checked;
+        refresh();
+      });
+    });
+    container.querySelectorAll(`.${prefix}-hol-hours, .${prefix}-hol-ot`).forEach(inp=>{
+      inp.addEventListener("input", ()=>{
+        const idx = Number(inp.getAttribute("data-hol-idx"));
+        const field = inp.classList.contains(`${prefix}-hol-hours`) ? "hoursWorked" : "otHours";
+        entries[idx][field] = Number(inp.value)||0;
+        // Update just this row's calculation, so the input keeps focus while typing.
+        const h = findHoliday(entries[idx].holidayId);
+        const calcBox = document.getElementById(`${prefix}-hol-calc-${idx}`);
+        if(h && calcBox){
+          const calc = computeHolidayEntry(entries[idx], h, hourlyRateFor(getEmp()), db.settings.dailyWorkingHours, db.settings.holidayRates || defaultHolidayRates());
+          calcBox.innerHTML = holidayEntryCalcHtml(calc);
+        }
+        if(onRecompute) onRecompute();
+      });
+    });
+  }
+
+  refresh();
+  return { refresh };
+}
+
 /* ---------------- PAYROLL: GENERATE ---------------- */
-const PR_FIELD_IDS = ["pr-othours","pr-nsdhours","pr-allow","pr-holiday","pr-bonus","pr-incentive","pr-other",
+const PR_FIELD_IDS = ["pr-othours","pr-nsdhours","pr-allow","pr-bonus","pr-incentive","pr-other",
   "pr-loan","pr-advance","pr-absences","pr-tardiness","pr-undertime","pr-comploan","pr-otherded"];
 
 function renderPayrollCreate(){
@@ -1025,10 +1471,13 @@ function renderPayrollCreate(){
       <div class="field"><label>Overtime Hours <span style="color:var(--ink-faint);">(125% of hourly rate)</span></label><input id="pr-othours" type="number" min="0" step="0.5" value="0"></div>
       <div class="field"><label>Night Differential Hours <span style="color:var(--ink-faint);">(+10% of hourly rate)</span></label><input id="pr-nsdhours" type="number" min="0" step="0.5" value="0"></div>
     </div>
-    <h3>Other Earnings</h3>
+    <h3>Philippine Holiday Pay</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Holidays that fall within the selected payroll period are listed automatically. Add an entry for each one the employee worked; pay is computed using the current DOLE-basis rates from Payroll Settings.</p>
+    <div id="pr-holiday-section"></div>
+    <h3 style="margin-top:18px;">Other Earnings</h3>
     <div class="form-grid">
       <div class="field"><label>Allowances</label><input id="pr-allow" type="number" min="0" step="0.01" value="0"></div>
-      <div class="field"><label>Holiday Pay</label><input id="pr-holiday" type="number" min="0" step="0.01" value="0"></div>
+      <div class="field"><label>Holiday Pay (computed)</label><input id="pr-holiday" type="text" disabled></div>
       <div class="field"><label>Bonuses</label><input id="pr-bonus" type="number" min="0" step="0.01" value="0"></div>
       <div class="field"><label>Incentives</label><input id="pr-incentive" type="number" min="0" step="0.01" value="0"></div>
       <div class="field span-2"><label>Other Earnings</label><input id="pr-other" type="number" min="0" step="0.01" value="0"></div>
@@ -1055,7 +1504,7 @@ function readPayrollForm(){
   const g = id => Number(document.getElementById(id).value)||0;
   return {
     regularHoursWorked: g("pr-reghours"), otHours: g("pr-othours"), nsdHours: g("pr-nsdhours"),
-    allowances: g("pr-allow"), holidayPay: g("pr-holiday"), bonuses: g("pr-bonus"),
+    allowances: g("pr-allow"), holidayEntries: state.prHolidayEntries, bonuses: g("pr-bonus"),
     incentives: g("pr-incentive"), otherEarnings: g("pr-other"),
     salaryLoan: g("pr-loan"), cashAdvance: g("pr-advance"), absences: g("pr-absences"),
     tardiness: g("pr-tardiness"), undertime: g("pr-undertime"), companyLoan: g("pr-comploan"),
@@ -1116,13 +1565,17 @@ function wirePayrollCreate(){
     document.getElementById("pr-basicpay").value = money(rec.basicSalary);
     document.getElementById("pr-daily").value = money(rec.dailyRate);
     document.getElementById("pr-hourly").value = money(rec.hourlyRate);
+    document.getElementById("pr-holiday").value = money(rec.holidayPay);
     document.getElementById("pr-preview").innerHTML = payrollPreviewHtml(rec);
   }
 
-  empSelect.addEventListener("change", updatePreview);
-  freqSelect.addEventListener("change", () => { toggleFrequencyUI(); updatePreview(); });
-  document.getElementById("pr-period-month").addEventListener("change", updatePreview);
-  document.getElementById("pr-period-start").addEventListener("change", () => { updateRangeDisplay(); updatePreview(); });
+  const holidayCtrl = wireHolidayEntriesBlock("pr", state.prHolidayEntries,
+    () => findEmployee(empSelect.value), getPayrollFormPeriod, "pr-holiday-section", updatePreview);
+
+  empSelect.addEventListener("change", () => { state.prHolidayEntries.length = 0; holidayCtrl.refresh(); });
+  freqSelect.addEventListener("change", () => { toggleFrequencyUI(); holidayCtrl.refresh(); });
+  document.getElementById("pr-period-month").addEventListener("change", () => holidayCtrl.refresh());
+  document.getElementById("pr-period-start").addEventListener("change", () => { updateRangeDisplay(); holidayCtrl.refresh(); });
   if(reghoursInput) reghoursInput.addEventListener("input", () => { reghoursInput.dataset.touched = "1"; });
   PR_FIELD_IDS.concat(["pr-reghours"]).forEach(id=>{
     const el = document.getElementById(id);
@@ -1146,18 +1599,27 @@ function wirePayrollCreate(){
     rec.id = "PR" + String(db.payrolls.length+1).padStart(4,"0") + Math.floor(Math.random()*90+10);
     db.payrolls.push(rec);
     saveDB(db);
+    state.prHolidayEntries = [];
     toast("Payroll record generated.");
     navigate("payrollHistory");
   });
 }
 
 function payrollPreviewHtml(rec){
+  const hasHoliday = rec.holidayPay > 0 || (rec.holidayBreakdown && rec.holidayBreakdown.length);
   return `
     <div class="calc-row"><span>Pay Frequency</span><span class="tabular">${rec.payFrequency==="biweekly" ? "Bi-Weekly" : "Monthly"}</span></div>
     <div class="calc-row"><span>Basic Salary</span><span class="tabular">${money(rec.basicSalary)}</span></div>
     <div class="calc-row"><span>Overtime Pay (${rec.otHours} hrs × ${Math.round(rec.otMultiplier*100)}%)</span><span class="tabular">${money(rec.otPay)}</span></div>
     <div class="calc-row"><span>Night Differential (${rec.nsdHours} hrs × ${Math.round(rec.nsdRate*100)}%)</span><span class="tabular">${money(rec.nsdPay)}</span></div>
-    <div class="calc-row"><span>Other Earnings</span><span class="tabular">${money(rec.allowances+rec.holidayPay+rec.bonuses+rec.incentives+rec.otherEarnings)}</span></div>
+    ${hasHoliday ? `
+    ${rec.regularHolidayPay?`<div class="calc-row"><span>Regular Holiday Pay</span><span class="tabular">${money(rec.regularHolidayPay)}</span></div>`:""}
+    ${rec.specialHolidayPay?`<div class="calc-row"><span>Special Holiday Pay</span><span class="tabular">${money(rec.specialHolidayPay)}</span></div>`:""}
+    ${rec.holidayRestDayPremium?`<div class="calc-row"><span>Holiday Rest Day Premium</span><span class="tabular">${money(rec.holidayRestDayPremium)}</span></div>`:""}
+    ${rec.holidayOvertimePay?`<div class="calc-row"><span>Holiday Overtime Pay</span><span class="tabular">${money(rec.holidayOvertimePay)}</span></div>`:""}
+    ${(!rec.regularHolidayPay && !rec.specialHolidayPay && !rec.holidayRestDayPremium && !rec.holidayOvertimePay)?`<div class="calc-row"><span>Holiday Pay</span><span class="tabular">${money(rec.holidayPay)}</span></div>`:""}
+    ` : ""}
+    <div class="calc-row"><span>Other Earnings</span><span class="tabular">${money(rec.allowances+(hasHoliday?0:rec.holidayPay)+rec.bonuses+rec.incentives+rec.otherEarnings)}</span></div>
     <div class="calc-row total"><span>Gross Pay</span><span class="tabular">${money(rec.gross)}</span></div>
     <div class="calc-row" style="margin-top:8px;"><span>SSS (EE ${Math.round(rec.sss.eeRate*100)}% of MSC ${money(rec.sss.msc)})</span><span class="tabular">− ${money(rec.sss.ee)}</span></div>
     <div class="calc-row"><span>PhilHealth (EE ${Math.round(rec.philhealth.eeShare*100)}% of ${Math.round(rec.philhealth.rate*100)}%)</span><span class="tabular">− ${money(rec.philhealth.ee)}</span></div>
@@ -1246,10 +1708,33 @@ function payslipHtml(p){
     <div class="payslip-row"><span>Basic Salary</span><span class="tabular">${money(p.basicSalary)}</span></div>
     <div class="payslip-row"><span>Overtime Pay — ${p.otHours} hrs @ ${Math.round(p.otMultiplier*100)}%</span><span class="tabular">${money(p.otPay)}</span></div>
     <div class="payslip-row"><span>Night Differential — ${p.nsdHours} hrs @ ${Math.round(p.nsdRate*100)}%</span><span class="tabular">${money(p.nsdPay)}</span></div>
-    <div class="payslip-row"><span>Holiday Pay</span><span class="tabular">${money(p.holidayPay)}</span></div>
+    ${(p.regularHolidayPay||p.specialHolidayPay||p.holidayRestDayPremium||p.holidayOvertimePay) ? `
+    ${p.regularHolidayPay?`<div class="payslip-row"><span>Regular Holiday Pay</span><span class="tabular">${money(p.regularHolidayPay)}</span></div>`:""}
+    ${p.specialHolidayPay?`<div class="payslip-row"><span>Special Holiday Pay</span><span class="tabular">${money(p.specialHolidayPay)}</span></div>`:""}
+    ${p.holidayRestDayPremium?`<div class="payslip-row"><span>Holiday Rest Day Premium</span><span class="tabular">${money(p.holidayRestDayPremium)}</span></div>`:""}
+    ${p.holidayOvertimePay?`<div class="payslip-row"><span>Holiday Overtime Pay</span><span class="tabular">${money(p.holidayOvertimePay)}</span></div>`:""}
+    ` : `<div class="payslip-row"><span>Holiday Pay</span><span class="tabular">${money(p.holidayPay)}</span></div>`}
     <div class="payslip-row"><span>Allowances</span><span class="tabular">${money(p.allowances)}</span></div>
     <div class="payslip-row"><span>Bonuses / Incentives / Other</span><span class="tabular">${money(round2(p.bonuses+p.incentives+p.otherEarnings))}</span></div>
     <div class="payslip-row net" style="background:var(--accent-soft);"><span>TOTAL EARNINGS (Gross Pay)</span><span class="tabular">${money(p.gross)}</span></div>
+    ${p.holidayBreakdown && p.holidayBreakdown.length ? `
+    <div class="payslip-row" style="flex-direction:column;align-items:stretch;">
+      <span style="font-weight:600;font-size:12px;color:var(--ink-soft);margin-bottom:2px;">HOLIDAY PAY DETAIL</span>
+      <table class="holiday-mini-table">
+        <thead><tr><th>Holiday</th><th>Date</th><th>Type</th><th>Hrs</th><th>Rate</th><th>Premium</th><th>Total</th></tr></thead>
+        <tbody>
+          ${p.holidayBreakdown.map(d=>`<tr>
+            <td>${d.holiday.name}</td>
+            <td class="tabular">${d.holiday.date}</td>
+            <td>${holidayTypeLabel(d.holiday.type)}${d.isRestDay?" · Rest Day":""}</td>
+            <td class="tabular">${d.hoursWorked}${d.otHours?` +${d.otHours} OT`:""}</td>
+            <td class="tabular">${d.rate?Math.round(d.rate*100)+"%":"—"}</td>
+            <td class="tabular">${money(d.restPremiumAmt)}</td>
+            <td class="tabular">${money(d.total)}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>` : ""}
 
     <div class="payslip-row" style="background:var(--bg);font-weight:600;">GOVERNMENT-MANDATED DEDUCTIONS</div>
     <div class="payslip-row"><span>SSS — Employee Share ${Math.round(p.sss.eeRate*100)}% of MSC ${money(p.sss.msc)}</span><span class="tabular">− ${money(p.sss.ee)}</span></div>
@@ -1308,7 +1793,7 @@ function editPayrollFormHtml(p){
     <div class="field"><label>Overtime Hours</label>${g("ep-othours", p.otHours)}</div>
     <div class="field"><label>Night Diff. Hours</label>${g("ep-nsdhours", p.nsdHours)}</div>
     <div class="field"><label>Allowances</label>${g("ep-allow", p.allowances)}</div>
-    <div class="field"><label>Holiday Pay</label>${g("ep-holiday", p.holidayPay)}</div>
+    <div class="field"><label>Holiday Pay (computed)</label><input id="ep-holiday" type="text" disabled value="${money(p.holidayPay)}"></div>
     <div class="field"><label>Bonuses</label>${g("ep-bonus", p.bonuses)}</div>
     <div class="field"><label>Incentives</label>${g("ep-incentive", p.incentives)}</div>
     <div class="field"><label>Other Earnings</label>${g("ep-other", p.otherEarnings)}</div>
@@ -1320,16 +1805,19 @@ function editPayrollFormHtml(p){
     <div class="field"><label>Company Loan</label>${g("ep-comploan", p.companyLoan)}</div>
     <div class="field span-2"><label>Other Deductions</label>${g("ep-otherded", p.otherDeductions)}</div>
   </div>
+  <h3 style="margin-top:16px;">Philippine Holiday Pay</h3>
+  <div id="ep-holiday-section"></div>
   <div class="calc-preview" id="ep-preview" style="margin-top:14px;"></div>`;
 }
 
-const EP_FIELD_IDS = ["ep-reghours","ep-othours","ep-nsdhours","ep-allow","ep-holiday","ep-bonus","ep-incentive","ep-other","ep-loan","ep-advance","ep-absences","ep-tardiness","ep-undertime","ep-comploan","ep-otherded"];
+const EP_FIELD_IDS = ["ep-reghours","ep-othours","ep-nsdhours","ep-allow","ep-bonus","ep-incentive","ep-other","ep-loan","ep-advance","ep-absences","ep-tardiness","ep-undertime","ep-comploan","ep-otherded"];
 
-function readEditPayrollForm(){
+function readEditPayrollForm(fallbackHolidayPay){
   const g = id => Number(document.getElementById(id).value)||0;
   return {
     regularHoursWorked: g("ep-reghours"), otHours: g("ep-othours"), nsdHours: g("ep-nsdhours"),
-    allowances: g("ep-allow"), holidayPay: g("ep-holiday"), bonuses: g("ep-bonus"),
+    allowances: g("ep-allow"), holidayEntries: state.epHolidayEntries,
+    holidayPay: state.epHolidayEntries.length ? 0 : (fallbackHolidayPay||0), bonuses: g("ep-bonus"),
     incentives: g("ep-incentive"), otherEarnings: g("ep-other"),
     salaryLoan: g("ep-loan"), cashAdvance: g("ep-advance"), absences: g("ep-absences"),
     tardiness: g("ep-tardiness"), undertime: g("ep-undertime"), companyLoan: g("ep-comploan"),
@@ -1353,6 +1841,8 @@ function openEditPayroll(id){
   const p = db.payrolls.find(x=>x.id===id);
   const emp = findEmployee(p.employeeId);
   state.editingPayrollId = id;
+  // Deep-copy so edits inside the modal don't mutate the saved record until "Save Changes" is confirmed.
+  state.epHolidayEntries = (p.holidayEntries||[]).map(e=>({...e}));
   openModal({
     title:"Edit Payroll Record",
     bodyHtml: editPayrollFormHtml(p),
@@ -1380,13 +1870,17 @@ function openEditPayroll(id){
     if(!emp) return;
     const period = getEditFormPeriod() || p.period;
     const frequency = getEditFormFrequency();
-    const rec = computePayrollRecord(emp, period, readEditPayrollForm(), db.settings, frequency);
+    const rec = computePayrollRecord(emp, period, readEditPayrollForm(p.holidayPay), db.settings, frequency);
+    document.getElementById("ep-holiday").value = money(rec.holidayPay);
     document.getElementById("ep-preview").innerHTML = payrollPreviewHtml(rec);
   };
+  const holidayCtrl = wireHolidayEntriesBlock("ep", state.epHolidayEntries,
+    () => emp, () => getEditFormPeriod() || p.period, "ep-holiday-section", upd);
+
   EP_FIELD_IDS.forEach(id2=>document.getElementById(id2).addEventListener("input", upd));
-  freqSelect.addEventListener("change", () => { toggleFrequencyUI(); upd(); });
-  document.getElementById("ep-period-month").addEventListener("change", upd);
-  document.getElementById("ep-period-start").addEventListener("change", () => { updateRangeDisplay(); upd(); });
+  freqSelect.addEventListener("change", () => { toggleFrequencyUI(); holidayCtrl.refresh(); });
+  document.getElementById("ep-period-month").addEventListener("change", () => holidayCtrl.refresh());
+  document.getElementById("ep-period-start").addEventListener("change", () => { updateRangeDisplay(); holidayCtrl.refresh(); });
   toggleFrequencyUI();
   upd();
 }
@@ -1402,7 +1896,7 @@ function saveEditedPayroll(existing, emp){
   }
   if(!emp){ toast("This employee no longer exists.", "error"); return; }
 
-  const rec = computePayrollRecord(emp, period, readEditPayrollForm(), db.settings, frequency);
+  const rec = computePayrollRecord(emp, period, readEditPayrollForm(existing.holidayPay), db.settings, frequency);
   rec.id = existing.id;
   const idx = db.payrolls.findIndex(p=>p.id===existing.id);
   db.payrolls[idx] = rec;
@@ -1576,6 +2070,21 @@ function renderSettings(){
   </div>
 
   <div class="panel" style="max-width:760px;">
+    <h3>Philippine Holiday Pay Rates</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Minimum statutory multipliers per DOLE rules. Update these if labor regulations change — holiday pay recalculates automatically, no code changes needed. Manage the holiday calendar itself from the Holidays page.</p>
+    <div class="form-grid">
+      <div class="field"><label>Regular Holiday, Worked (%)</label><input id="st-hol-regworked" type="number" min="100" step="1" value="${Math.round(s.holidayRates.regularWorked*100)}"></div>
+      <div class="field"><label>Regular Holiday + Rest Day, Worked (%)</label><input id="st-hol-regrest" type="number" min="100" step="1" value="${Math.round(s.holidayRates.regularRestDayWorked*100)}"></div>
+      <div class="field"><label>Regular Holiday Overtime Multiplier (%)</label><input id="st-hol-regot" type="number" min="100" step="1" value="${Math.round(s.holidayRates.regularOtMultiplier*100)}"></div>
+      <div class="field"></div>
+      <div class="field"><label>Special Non-Working Day, Worked (%)</label><input id="st-hol-specworked" type="number" min="100" step="1" value="${Math.round(s.holidayRates.specialWorked*100)}"></div>
+      <div class="field"><label>Special Non-Working + Rest Day, Worked (%)</label><input id="st-hol-specrest" type="number" min="100" step="1" value="${Math.round(s.holidayRates.specialRestDayWorked*100)}"></div>
+      <div class="field"><label>Special Non-Working Overtime Multiplier (%)</label><input id="st-hol-specot" type="number" min="100" step="1" value="${Math.round(s.holidayRates.specialOtMultiplier*100)}"></div>
+      <div class="field"><label>Special Working Day (%)</label><input id="st-hol-workingday" type="number" min="0" step="1" value="${Math.round(s.holidayRates.specialWorkingWorked*100)}"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width:760px;">
     <h3>BIR Withholding Tax Table (Monthly)</h3>
     <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Edit the bracket boundaries, base tax, and rate for each row. Leave the last row's "Over" field blank for no ceiling.</p>
     <div class="table-wrap">
@@ -1641,6 +2150,14 @@ function wireSettingsForm(){
     s.pagibig.thresholdComp = g("st-pi-threshold");
     s.pagibig.erRate = g("st-pi-er")/100;
     s.pagibig.compCeiling = g("st-pi-ceiling");
+
+    s.holidayRates.regularWorked = g("st-hol-regworked")/100;
+    s.holidayRates.regularRestDayWorked = g("st-hol-regrest")/100;
+    s.holidayRates.regularOtMultiplier = g("st-hol-regot")/100;
+    s.holidayRates.specialWorked = g("st-hol-specworked")/100;
+    s.holidayRates.specialRestDayWorked = g("st-hol-specrest")/100;
+    s.holidayRates.specialOtMultiplier = g("st-hol-specot")/100;
+    s.holidayRates.specialWorkingWorked = g("st-hol-workingday")/100;
 
     const mins = document.querySelectorAll(".bir-min"), maxs = document.querySelectorAll(".bir-max"),
           bases = document.querySelectorAll(".bir-base"), rates = document.querySelectorAll(".bir-rate");
@@ -1764,6 +2281,27 @@ function wireShellEvents(){
   });
   document.querySelectorAll("[data-del-emp]").forEach(el=>{
     el.addEventListener("click", ()=> confirmDeleteEmployee(el.getAttribute("data-del-emp")));
+  });
+
+  // Holiday Management page
+  const addHolBtn = document.getElementById("add-holiday-btn");
+  if(addHolBtn) addHolBtn.addEventListener("click", () => openHolidayModal(null));
+  const holSearch = document.getElementById("holiday-search");
+  if(holSearch){
+    holSearch.addEventListener("input", (e)=>{ state.holidaySearch = e.target.value; render(); });
+    holSearch.focus();
+    holSearch.selectionStart = holSearch.selectionEnd = holSearch.value.length;
+  }
+  const holTypeFilter = document.getElementById("holiday-type-filter");
+  if(holTypeFilter) holTypeFilter.addEventListener("change", (e)=>{ state.holidayTypeFilter = e.target.value; render(); });
+  document.querySelectorAll("[data-edit-hol]").forEach(el=>{
+    el.addEventListener("click", ()=> openHolidayModal(el.getAttribute("data-edit-hol")));
+  });
+  document.querySelectorAll("[data-toggle-hol]").forEach(el=>{
+    el.addEventListener("click", ()=> toggleHolidayStatus(el.getAttribute("data-toggle-hol")));
+  });
+  document.querySelectorAll("[data-del-hol]").forEach(el=>{
+    el.addEventListener("click", ()=> confirmDeleteHoliday(el.getAttribute("data-del-hol")));
   });
 
   // Payroll create page
