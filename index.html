@@ -217,7 +217,7 @@
 /* ============================================================
    DATA LAYER
 ============================================================ */
-const STORAGE_KEY = "ledgerPayrollDB_v4";
+const STORAGE_KEY = "ledgerPayrollDB_v5";
 
 function defaultSettings(){
   return {
@@ -229,9 +229,17 @@ function defaultSettings(){
     nsdRate: 0.10,                 // 10% additional pay
     payrollCutoff: "1st–15th and 16th–end of month",
     payDate: "Every 15th and last working day of the month",
-    sss: { floorComp:5000, ceilingComp:35000, increment:500, eeRate:0.05, erRate:0.10 },
+    // Employer-only SSS Employees' Compensation (EC) add-on, riding on the same Monthly Salary
+    // Credit used for the main SSS contribution above: a flat ₱10/month while MSC is at or below
+    // the threshold, ₱30/month once MSC exceeds it. Not deducted from the employee — it's paid
+    // entirely by the employer, so it never touches gross/net pay, only the employer-cost total.
+    sss: { floorComp:5000, ceilingComp:35000, increment:500, eeRate:0.05, erRate:0.10,
+      ec: { threshold:14500, lowAmount:10, highAmount:30 } },
     philhealth: { rate:0.05, eeShare:0.5, floor:10000, ceiling:100000 },
     pagibig: { thresholdComp:1500, eeRateBelow:0.01, eeRateAbove:0.02, erRate:0.02, compCeiling:10000 },
+    // 13th month pay (PD 851): amounts up to this ceiling per year are tax-exempt; any excess is
+    // taxed. Admin-editable in case the statutory ceiling changes.
+    thirteenthMonth: { exemptCeiling: 90000 },
     bir: { table: [
       {min:0,       max:20833,  base:0,        rate:0.00},
       {min:20833,   max:33333,  base:0,        rate:0.15},
@@ -261,12 +269,12 @@ function defaultHolidayRates(){
 
 function seedData(){
   const employees = [
-    {id:"EMP001", fullName:"Juan Dela Cruz", position:"Software Developer", department:"Information Technology", employmentStatus:"Regular", basicSalary:35000, status:"Active", email:"juan.delacruz@ledgerco.com", username:"juan.delacruz", password:"Employee123"},
-    {id:"EMP002", fullName:"Maria Santos", position:"HR Officer", department:"Human Resources", employmentStatus:"Regular", basicSalary:28000, status:"Active", email:"maria.santos@ledgerco.com", username:"maria.santos", password:"Employee123"},
-    {id:"EMP003", fullName:"Pedro Reyes", position:"Accountant", department:"Finance", employmentStatus:"Regular", basicSalary:32000, status:"Active", email:"pedro.reyes@ledgerco.com", username:"pedro.reyes", password:"Employee123"},
-    {id:"EMP004", fullName:"Ana Lopez", position:"Marketing Specialist", department:"Marketing", employmentStatus:"Probationary", basicSalary:27000, status:"Active", email:"ana.lopez@ledgerco.com", username:"ana.lopez", password:"Employee123"},
-    {id:"EMP005", fullName:"Carlo Mendoza", position:"Network Administrator", department:"Information Technology", employmentStatus:"Regular", basicSalary:34000, status:"On Leave", email:"carlo.mendoza@ledgerco.com", username:"carlo.mendoza", password:"Employee123"},
-    {id:"EMP006", fullName:"Liza Fernandez", position:"Customer Support Rep.", department:"Operations", employmentStatus:"Regular", basicSalary:24000, status:"Active", email:"liza.fernandez@ledgerco.com", username:"liza.fernandez", password:"Employee123"}
+    {id:"EMP001", fullName:"Juan Dela Cruz", position:"Software Developer", department:"Information Technology", employmentStatus:"Regular", basicSalary:35000, status:"Active", email:"juan.delacruz@ledgerco.com", username:"juan.delacruz", password:"Employee123", vlBalance:15, slBalance:15},
+    {id:"EMP002", fullName:"Maria Santos", position:"HR Officer", department:"Human Resources", employmentStatus:"Regular", basicSalary:28000, status:"Active", email:"maria.santos@ledgerco.com", username:"maria.santos", password:"Employee123", vlBalance:15, slBalance:15},
+    {id:"EMP003", fullName:"Pedro Reyes", position:"Accountant", department:"Finance", employmentStatus:"Regular", basicSalary:32000, status:"Active", email:"pedro.reyes@ledgerco.com", username:"pedro.reyes", password:"Employee123", vlBalance:15, slBalance:15},
+    {id:"EMP004", fullName:"Ana Lopez", position:"Marketing Specialist", department:"Marketing", employmentStatus:"Probationary", basicSalary:27000, status:"Active", email:"ana.lopez@ledgerco.com", username:"ana.lopez", password:"Employee123", vlBalance:15, slBalance:15},
+    {id:"EMP005", fullName:"Carlo Mendoza", position:"Network Administrator", department:"Information Technology", employmentStatus:"Regular", basicSalary:34000, status:"On Leave", email:"carlo.mendoza@ledgerco.com", username:"carlo.mendoza", password:"Employee123", vlBalance:11, slBalance:15},
+    {id:"EMP006", fullName:"Liza Fernandez", position:"Customer Support Rep.", department:"Operations", employmentStatus:"Regular", basicSalary:24000, status:"Active", email:"liza.fernandez@ledgerco.com", username:"liza.fernandez", password:"Employee123", vlBalance:15, slBalance:15}
   ];
 
   const settings = defaultSettings();
@@ -308,12 +316,20 @@ function seedData(){
     });
   });
 
+  // A sample leave entry consistent with EMP005 (Carlo Mendoza) being seeded "On Leave" —
+  // 4 days VL already logged and deducted from his balance above.
+  const leaves = [
+    { id:"LV0001", employeeId:"EMP005", type:"VL", startDate:"2026-09-22", endDate:"2026-09-25", days:4,
+      note:"Approved vacation leave.", createdAt:"2026-09-15", createdBy:"admin" }
+  ];
+
   return {
     admin: {username:"admin", password:"Admin123", fullName:"System Administrator"},
     employees,
     payrolls,
     settings,
-    holidays: seedHolidays()
+    holidays: seedHolidays(),
+    leaves
   };
 }
 
@@ -460,11 +476,21 @@ function round2(n){ return Math.round((Number(n)||0) * 100) / 100; }
 function computeSSS(basicMonthly, settings){
   const s = settings.sss;
   const comp = Math.max(s.floorComp, Math.min(basicMonthly, s.ceilingComp));
-  let msc = Math.ceil(comp / s.increment) * s.increment;
+  // SSS assigns the Monthly Salary Credit by which ₱500 bracket the compensation falls
+  // nearest to (e.g. ₱19,750–₱20,249.99 → MSC ₱20,000), not by rounding up to the next
+  // bracket — so this must be a nearest-bracket round, not a ceiling.
+  let msc = Math.round(comp / s.increment) * s.increment;
   msc = Math.max(s.floorComp, Math.min(msc, s.ceilingComp));
   const ee = round2(msc * s.eeRate);
   const er = round2(msc * s.erRate);
   return {msc, eeRate:s.eeRate, erRate:s.erRate, ee, er, total: round2(ee+er)};
+}
+
+// SSS Employees' Compensation (EC) contribution — a small employer-only add-on riding on the
+// same Monthly Salary Credit as the main SSS contribution. Never deducted from the employee.
+function computeEC(msc, settings){
+  const e = (settings.sss && settings.sss.ec) || {threshold:14500, lowAmount:10, highAmount:30};
+  return round2(msc > e.threshold ? e.highAmount : e.lowAmount);
 }
 
 function computePhilHealth(basicMonthly, settings){
@@ -546,6 +572,8 @@ function computePayrollRecord(emp, period, inputs, settings, payFrequency){
   const sss = scaleContribution(sssMonthly, splitFactor);
   const philhealth = scaleContribution(philhealthMonthly, splitFactor);
   const pagibig = scaleContribution(pagibigMonthly, splitFactor);
+  // SSS EC: employer-only, informational — never subtracted from the employee's pay.
+  const ec = round2(computeEC(sssMonthly.msc, settings) * splitFactor);
 
   // Withholding tax: bring this period's gross up to a monthly-equivalent figure, tax it against the
   // monthly BIR table, then bring the resulting tax back down to a per-period amount.
@@ -561,7 +589,12 @@ function computePayrollRecord(emp, period, inputs, settings, payFrequency){
   const undertime = Number(inputs.undertime)||0;
   const companyLoan = Number(inputs.companyLoan)||0;
   const otherDeductions = Number(inputs.otherDeductions)||0;
-  const otherDeductTotal = round2(salaryLoan+cashAdvance+absences+tardiness+undertime+companyLoan+otherDeductions);
+  // Unpaid leave: days come from Leave Management entries logged as type "Unpaid" that fall
+  // inside this payroll period (see unpaidLeaveDaysInPeriod). Paid VL/SL leave draws down the
+  // employee's leave balance instead and does not reduce pay.
+  const unpaidLeaveDays = Number(inputs.unpaidLeaveDays)||0;
+  const unpaidLeaveDeduction = round2(dailyRate * unpaidLeaveDays);
+  const otherDeductTotal = round2(salaryLoan+cashAdvance+absences+tardiness+undertime+companyLoan+otherDeductions+unpaidLeaveDeduction);
 
   const totalDeductions = round2(sss.ee + philhealth.ee + pagibig.ee + withholdingTax.amount + otherDeductTotal);
   const netPay = round2(grossPay - totalDeductions);
@@ -574,8 +607,9 @@ function computePayrollRecord(emp, period, inputs, settings, payFrequency){
     basicSalary: basicPay, allowances, holidayPay, bonuses, incentives, otherEarnings,
     holidayEntries, holidayBreakdown, regularHolidayPay, specialHolidayPay, holidayRestDayPremium, holidayOvertimePay,
     gross: grossPay,
-    sss, philhealth, pagibig, withholdingTax,
-    salaryLoan, cashAdvance, absences, tardiness, undertime, companyLoan, otherDeductions, otherDeductTotal,
+    sss, philhealth, pagibig, withholdingTax, ec,
+    salaryLoan, cashAdvance, absences, tardiness, undertime, companyLoan, otherDeductions,
+    unpaidLeaveDays, unpaidLeaveDeduction, otherDeductTotal,
     overtime: otPay, // legacy alias used by list views
     deductions: totalDeductions, // legacy alias used by list views
     totalDeductions,
@@ -590,7 +624,14 @@ function loadDB(){
       const parsed = JSON.parse(raw);
       if(!parsed.settings) parsed.settings = defaultSettings();
       if(!parsed.settings.holidayRates) parsed.settings.holidayRates = defaultHolidayRates();
+      if(!parsed.settings.sss.ec) parsed.settings.sss.ec = defaultSettings().sss.ec;
+      if(!parsed.settings.thirteenthMonth) parsed.settings.thirteenthMonth = defaultSettings().thirteenthMonth;
       if(!Array.isArray(parsed.holidays)) parsed.holidays = seedHolidays();
+      if(!Array.isArray(parsed.leaves)) parsed.leaves = [];
+      (parsed.employees||[]).forEach(e=>{
+        if(typeof e.vlBalance !== "number") e.vlBalance = 15;
+        if(typeof e.slBalance !== "number") e.slBalance = 15;
+      });
       return parsed;
     }
   }catch(e){}
@@ -621,7 +662,9 @@ const state = {
   holidayTypeFilter: "",
   editingHolidayId: null,
   prHolidayEntries: [],   // {holidayId, hoursWorked, otHours, isRestDay} — Generate Payroll form
-  epHolidayEntries: []    // same shape — Edit Payroll modal
+  epHolidayEntries: [],   // same shape — Edit Payroll modal
+  leaveFilterEmp: "",
+  thirteenthYear: new Date().getFullYear()
 };
 
 function money(n){
@@ -639,6 +682,9 @@ function initials(name){
 // Monthly periods are stored as "YYYY-MM" (e.g. "2026-09").
 // Bi-weekly periods are stored as "YYYY-MM-DD_YYYY-MM-DD" — a 14-day cutoff (e.g. "2026-09-01_2026-09-14").
 function isBiweeklyPeriod(p){ return typeof p === "string" && p.indexOf("_") !== -1; }
+// 13th month pay records use a synthetic yearly "period" of the form "YYYY-13TH" so they sort
+// and filter alongside regular payroll periods without needing a parallel data structure.
+function isThirteenthMonthPeriod(p){ return typeof p === "string" && /^\d{4}-13TH$/.test(p); }
 function inferFrequencyFromPeriod(p){ return isBiweeklyPeriod(p) ? "biweekly" : "monthly"; }
 function parseISODate(s){
   const [y,m,d] = s.split("-").map(Number);
@@ -656,6 +702,10 @@ function biweeklyPeriodFromStart(startStr){
 }
 // Inclusive date range covered by a period string, used for chronological sorting and overlap checks.
 function periodRange(p){
+  if(isThirteenthMonthPeriod(p)){
+    const y = Number(p.slice(0,4));
+    return { start: new Date(y,0,1), end: new Date(y,11,31) };
+  }
   if(isBiweeklyPeriod(p)){
     const [s,e] = p.split("_");
     return { start: parseISODate(s), end: parseISODate(e) };
@@ -671,9 +721,12 @@ function periodsOverlap(pA, pB){
 // Finds another payroll record for the same employee whose period date range overlaps this one
 // (covers monthly-vs-monthly, bi-weekly-vs-bi-weekly, and mixed monthly/bi-weekly overlaps).
 function findOverlappingPayroll(employeeId, period, excludeId){
-  return db.payrolls.find(p => p.employeeId===employeeId && p.id!==excludeId && periodsOverlap(p.period, period));
+  // 13th month records span the whole calendar year but are a separate annual payout, not a
+  // regular cutoff, so they're excluded from the regular-period overlap check.
+  return db.payrolls.find(p => p.employeeId===employeeId && p.id!==excludeId && p.recordType!=="13th_month" && periodsOverlap(p.period, period));
 }
 function periodLabel(p){
+  if(isThirteenthMonthPeriod(p)) return `13th Month Pay ${p.slice(0,4)}`;
   if(isBiweeklyPeriod(p)){
     const [s,e] = p.split("_");
     const start = parseISODate(s), end = parseISODate(e);
@@ -686,6 +739,68 @@ function periodLabel(p){
   return d.toLocaleString("en-US",{month:"long", year:"numeric"});
 }
 function findEmployee(id){ return db.employees.find(e=>e.id===id); }
+
+/* ---------------- LEAVE (VL/SL) TRACKING ---------------- */
+function findLeave(id){ return (db.leaves||[]).find(l=>l.id===id); }
+function leaveTypeLabel(t){ return t==="VL" ? "Vacation Leave" : t==="SL" ? "Sick Leave" : "Unpaid Leave"; }
+function daysBetweenInclusive(startStr, endStr){
+  const s = parseISODate(startStr), e = parseISODate(endStr);
+  return Math.round((e - s) / 86400000) + 1;
+}
+// How many of a leave entry's days fall inside a given payroll period — used to auto-detect
+// unpaid leave when generating payroll, and to support leave spanning multiple pay periods.
+function leaveDaysOverlappingPeriod(leave, period){
+  const pr = periodRange(period);
+  const s = parseISODate(leave.startDate), e = parseISODate(leave.endDate);
+  const start = s > pr.start ? s : pr.start;
+  const end = e < pr.end ? e : pr.end;
+  if(start > end) return 0;
+  return Math.round((end - start) / 86400000) + 1;
+}
+function unpaidLeaveDaysInPeriod(employeeId, period){
+  if(!period) return 0;
+  return (db.leaves||[]).filter(l => l.employeeId===employeeId && l.type==="Unpaid")
+    .reduce((sum, l) => sum + leaveDaysOverlappingPeriod(l, period), 0);
+}
+function employeeLeaveHistory(employeeId){
+  return (db.leaves||[]).filter(l=>l.employeeId===employeeId).sort((a,b)=> parseISODate(b.startDate)-parseISODate(a.startDate));
+}
+function getFilteredLeaves(){
+  let list = [...(db.leaves||[])];
+  if(state.leaveFilterEmp) list = list.filter(l=>l.employeeId===state.leaveFilterEmp);
+  return list.sort((a,b)=> parseISODate(b.startDate)-parseISODate(a.startDate));
+}
+
+/* ---------------- 13TH MONTH PAY (PD 851) ---------------- */
+// Total basic salary actually paid out across the calendar year, divided by 12 — the statutory
+// formula. Using each period's already-prorated Basic Pay figure (not the monthly rate) means an
+// employee who joined mid-year, or was on unpaid leave, is automatically prorated correctly,
+// since periods with no payroll record simply contribute nothing.
+function computeThirteenthMonthBasis(employeeId, year){
+  return round2(db.payrolls
+    .filter(p => p.employeeId===employeeId && p.recordType!=="13th_month" && periodRange(p.period).start.getFullYear()===year)
+    .reduce((sum,p)=> sum + (Number(p.basicSalary)||0), 0));
+}
+function releasedThirteenthMonth(employeeId, year){
+  return db.payrolls.find(p => p.employeeId===employeeId && p.recordType==="13th_month" && p.period===`${year}-13TH`);
+}
+function availableYearsForThirteenth(){
+  const years = new Set([new Date().getFullYear()]);
+  db.payrolls.forEach(p=>{ if(p.recordType!=="13th_month") years.add(periodRange(p.period).start.getFullYear()); });
+  return [...years].sort((a,b)=>b-a);
+}
+// Simplification, noted on the page itself: the taxable excess over the exemption ceiling is run
+// through the same monthly BIR table as a stand-in for the annualized computation BIR actually
+// requires. Good enough for an estimate; a real payroll run should true this up at year-end.
+function computeThirteenthMonthPay(employeeId, year, settings){
+  const basis = computeThirteenthMonthBasis(employeeId, year);
+  const gross = round2(basis / 12);
+  const ceiling = (settings.thirteenthMonth && settings.thirteenthMonth.exemptCeiling) || 90000;
+  const taxableExcess = round2(Math.max(0, gross - ceiling));
+  const tax = taxableExcess > 0 ? computeWithholdingTax(taxableExcess, settings).amount : 0;
+  const net = round2(gross - tax);
+  return { basis, gross, ceiling, taxableExcess, tax, net };
+}
 
 function openPrintWindow(title, innerHtml){
   const w = window.open("", "_blank", "width=480,height=680");
@@ -845,7 +960,9 @@ function navItemsFor(role){
       {v:"employees", label:"Employees"},
       {v:"payroll", label:"Payroll"},
       {v:"payrollHistory", label:"Payroll History"},
+      {v:"thirteenthMonth", label:"13th Month Pay"},
       {v:"holidays", label:"Holidays"},
+      {v:"leaves", label:"Leave Management"},
       {v:"settings", label:"Payroll Settings"},
       {v:"profile", label:"Profile"}
     ];
@@ -853,6 +970,7 @@ function navItemsFor(role){
   return [
     {v:"employeeDashboard", label:"Dashboard"},
     {v:"myPayroll", label:"My Payroll"},
+    {v:"myLeave", label:"My Leave"},
     {v:"profile", label:"Profile"}
   ];
 }
@@ -862,7 +980,9 @@ function renderShell(){
   const items = navItemsFor(user.role);
   const pageTitleMap = {
     adminDashboard:"Dashboard", employeeDashboard:"Dashboard", employees:"Employees",
-    payroll:"Payroll", payrollHistory:"Payroll History", holidays:"Holiday Management", myPayroll:"My Payroll", profile:"Profile"
+    payroll:"Payroll", payrollHistory:"Payroll History", holidays:"Holiday Management",
+    thirteenthMonth:"13th Month Pay", leaves:"Leave Management", myLeave:"My Leave",
+    myPayroll:"My Payroll", profile:"Profile"
   };
 
   return `
@@ -915,9 +1035,12 @@ function renderPage(view){
     case "payroll": return renderPayrollCreate();
     case "payrollHistory": return renderPayrollHistory();
     case "holidays": return renderHolidayManagement();
+    case "thirteenthMonth": return renderThirteenthMonth();
+    case "leaves": return renderLeaveManagement();
     case "settings": return renderSettings();
     case "employeeDashboard": return renderEmployeeDashboard();
     case "myPayroll": return renderMyPayroll();
+    case "myLeave": return renderMyLeave();
     case "profile": return renderProfile();
     default: return `<div class="empty-state">Page not found.</div>`;
   }
@@ -941,7 +1064,11 @@ function renderAdminDashboard(){
   const totalEmployees = db.employees.length;
   const activeEmployees = db.employees.filter(e=>e.status==="Active").length;
 
-  const byEmp = latestRecordsPerEmployee(db.payrolls);
+  // 13th month releases are an annual bonus payout, not a regular cutoff, so they're excluded
+  // from the "most recent run" comparison — otherwise releasing one would make the dashboard's
+  // net-pay figure jump to the 13th month amount instead of reflecting the latest regular payroll.
+  const regularPayrolls = db.payrolls.filter(p=>p.recordType!=="13th_month");
+  const byEmp = latestRecordsPerEmployee(regularPayrolls);
   const latestRecords = Object.values(byEmp).map(arr=>arr[0]).filter(Boolean);
   const prevRecords = Object.values(byEmp).map(arr=>arr[1]).filter(Boolean);
   const mostRecentEnd = latestRecords.reduce((max,p)=>{
@@ -1149,7 +1276,8 @@ function saveEmployeeForm(existing){
     return;
   }
 
-  const record = {id, fullName, position, department, employmentStatus, basicSalary, status, email, username, password};
+  const record = {id, fullName, position, department, employmentStatus, basicSalary, status, email, username, password,
+    vlBalance: existing ? existing.vlBalance : 15, slBalance: existing ? existing.slBalance : 15};
 
   if(existing){
     const idx = db.employees.findIndex(e=>e.id===existing.id);
@@ -1174,6 +1302,7 @@ function confirmDeleteEmployee(id){
     onConfirm: () => {
       db.employees = db.employees.filter(e=>e.id!==id);
       db.payrolls = db.payrolls.filter(p=>p.employeeId!==id);
+      db.leaves = (db.leaves||[]).filter(l=>l.employeeId!==id);
       saveDB(db);
       toast("Employee deleted.");
       closeModal();
@@ -1461,6 +1590,349 @@ function wireHolidayEntriesBlock(prefix, entries, getEmp, getPeriod, containerId
   return { refresh };
 }
 
+/* ---------------- LEAVE MANAGEMENT (Admin) ---------------- */
+function renderLeaveManagement(){
+  const empOptions = `<option value="">All Employees</option>` + db.employees.map(e=>`<option value="${e.id}" ${state.leaveFilterEmp===e.id?"selected":""}>${e.fullName}</option>`).join("");
+  const list = getFilteredLeaves();
+
+  return `
+  <div class="page-head">
+    <div><h2>Leave Management</h2><p>Track VL/SL balances and log leave taken. Unpaid leave logged here is automatically detected as a deduction when generating payroll for the same period.</p></div>
+    <button class="btn btn-primary" id="add-leave-btn">Log Leave</button>
+  </div>
+
+  <div class="panel" style="padding:0;margin-bottom:24px;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Employee</th><th>VL Balance</th><th>SL Balance</th><th></th></tr></thead>
+        <tbody>
+          ${db.employees.map(e=>`
+            <tr>
+              <td class="tabular">${e.id}</td>
+              <td>${e.fullName}</td>
+              <td class="tabular">${e.vlBalance} day${e.vlBalance===1?"":"s"}</td>
+              <td class="tabular">${e.slBalance} day${e.slBalance===1?"":"s"}</td>
+              <td><div class="row-actions"><button class="btn btn-ghost btn-sm btn-ghost-plum" data-adjust-bal="${e.id}">Adjust Balance</button></div></td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="filters"><select id="leave-emp-filter">${empOptions}</select></div>
+  </div>
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Days</th><th>Note</th><th></th></tr></thead>
+        <tbody>
+        ${list.length===0 ? `<tr><td colspan="6"><div class="empty-state">No leave records match this filter.</div></td></tr>` :
+        list.map(l=>{
+          const emp = findEmployee(l.employeeId) || {fullName:"(deleted employee)"};
+          const badgeClass = l.type==="VL" ? "holiday-badge-regular" : l.type==="SL" ? "holiday-badge-special_working" : "holiday-badge-special_non_working";
+          return `<tr>
+            <td>${emp.fullName}</td>
+            <td><span class="holiday-badge ${badgeClass}">${leaveTypeLabel(l.type)}</span></td>
+            <td class="tabular">${l.startDate} – ${l.endDate}</td>
+            <td class="tabular">${l.days}</td>
+            <td style="font-size:12px;color:var(--ink-soft);">${l.note||""}</td>
+            <td><div class="row-actions"><button class="btn btn-ghost btn-sm" data-del-leave="${l.id}" style="color:var(--danger);">Delete</button></div></td>
+          </tr>`;
+        }).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function leaveFormHtml(){
+  const options = db.employees.map(e=>`<option value="${e.id}">${e.fullName} — ${e.id} (VL ${e.vlBalance} / SL ${e.slBalance})</option>`).join("");
+  return `
+  <div class="form-grid">
+    <div class="field span-2"><label>Employee</label><select id="lf-employee">${options}</select></div>
+    <div class="field"><label>Leave Type</label>
+      <select id="lf-type">
+        <option value="VL">Vacation Leave (paid)</option>
+        <option value="SL">Sick Leave (paid)</option>
+        <option value="Unpaid">Unpaid Leave</option>
+      </select>
+    </div>
+    <div class="field"></div>
+    <div class="field"><label>Start Date</label><input id="lf-start" type="date" value="2026-09-01"></div>
+    <div class="field"><label>End Date</label><input id="lf-end" type="date" value="2026-09-01"></div>
+    <div class="field span-2"><label>Note</label><input id="lf-note" type="text" placeholder="Optional"></div>
+  </div>
+  <div id="lf-summary" style="font-size:12.5px;color:var(--ink-soft);margin-top:4px;"></div>`;
+}
+
+function openLeaveModal(){
+  openModal({
+    title: "Log Leave",
+    bodyHtml: leaveFormHtml(),
+    confirmLabel: "Log Leave",
+    onConfirm: saveLeaveForm
+  });
+  const empSel = document.getElementById("lf-employee");
+  const typeSel = document.getElementById("lf-type");
+  const startInp = document.getElementById("lf-start");
+  const endInp = document.getElementById("lf-end");
+  function updateSummary(){
+    const emp = findEmployee(empSel.value);
+    const days = Math.max(0, daysBetweenInclusive(startInp.value, endInp.value));
+    const box = document.getElementById("lf-summary");
+    if(!emp || !startInp.value || !endInp.value || days<=0){ box.textContent = ""; return; }
+    if(typeSel.value==="Unpaid"){
+      box.textContent = `${days} day(s) — unpaid, does not affect VL/SL balance. Will be auto-detected as a payroll deduction for any period it overlaps.`;
+    } else {
+      const bal = typeSel.value==="VL" ? emp.vlBalance : emp.slBalance;
+      box.textContent = `${days} day(s) — ${bal >= days ? `${bal-days} day(s) will remain` : `insufficient balance (only ${bal} day(s) available)`}.`;
+      box.style.color = bal>=days ? "var(--ink-soft)" : "var(--danger)";
+    }
+  }
+  [empSel, typeSel, startInp, endInp].forEach(el=> el.addEventListener("input", updateSummary));
+  [empSel, typeSel].forEach(el=> el.addEventListener("change", updateSummary));
+  updateSummary();
+}
+
+function saveLeaveForm(){
+  const employeeId = document.getElementById("lf-employee").value;
+  const type = document.getElementById("lf-type").value;
+  const startDate = document.getElementById("lf-start").value;
+  const endDate = document.getElementById("lf-end").value;
+  const note = document.getElementById("lf-note").value.trim();
+  const emp = findEmployee(employeeId);
+
+  if(!emp || !startDate || !endDate){ toast("Please complete all required fields.", "error"); return; }
+  const days = daysBetweenInclusive(startDate, endDate);
+  if(days <= 0){ toast("End date must be on or after the start date.", "error"); return; }
+
+  if(type !== "Unpaid"){
+    const balField = type==="VL" ? "vlBalance" : "slBalance";
+    if(emp[balField] < days){
+      toast(`Insufficient ${type} balance — only ${emp[balField]} day(s) available.`, "error");
+      return;
+    }
+    emp[balField] = round2(emp[balField] - days);
+  }
+
+  if(!db.leaves) db.leaves = [];
+  const who = (state.currentUser && state.currentUser.username) || "admin";
+  const newId = "LV" + String(db.leaves.length+1).padStart(4,"0") + Math.floor(Math.random()*90+10);
+  db.leaves.push({ id:newId, employeeId, type, startDate, endDate, days, note, createdAt: isoDate(new Date()), createdBy: who });
+  saveDB(db);
+  toast("Leave logged.");
+  closeModal();
+  render();
+}
+
+function confirmDeleteLeave(id){
+  const l = findLeave(id);
+  if(!l) return;
+  const emp = findEmployee(l.employeeId) || {fullName:"this employee"};
+  openConfirmModal({
+    title:"Delete Leave Record",
+    message: `Delete this ${leaveTypeLabel(l.type)} record for ${emp.fullName} (${l.startDate} – ${l.endDate})?${l.type!=="Unpaid" ? " The days will be credited back to their balance." : ""} This cannot be undone.`,
+    confirmLabel:"Delete",
+    danger:true,
+    onConfirm: () => {
+      if(l.type !== "Unpaid"){
+        const target = findEmployee(l.employeeId);
+        if(target){
+          const balField = l.type==="VL" ? "vlBalance" : "slBalance";
+          target[balField] = round2(target[balField] + l.days);
+        }
+      }
+      db.leaves = db.leaves.filter(x=>x.id!==id);
+      saveDB(db);
+      toast("Leave record deleted.");
+      closeModal();
+      render();
+    }
+  });
+}
+
+function adjustBalanceFormHtml(emp){
+  return `
+  <div class="form-grid">
+    <div class="field span-2"><label>Employee</label><input type="text" value="${emp.fullName} — ${emp.id}" disabled></div>
+    <div class="field"><label>VL Balance (days)</label><input id="ab-vl" type="number" min="0" step="0.5" value="${emp.vlBalance}"></div>
+    <div class="field"><label>SL Balance (days)</label><input id="ab-sl" type="number" min="0" step="0.5" value="${emp.slBalance}"></div>
+  </div>
+  <p style="color:var(--ink-soft);font-size:12px;margin-top:10px;">Sets the balance directly — use this for annual credit grants or corrections. Leave taken through "Log Leave" adjusts these automatically.</p>`;
+}
+
+function openAdjustBalanceModal(employeeId){
+  const emp = findEmployee(employeeId);
+  if(!emp) return;
+  openModal({
+    title: `Adjust Leave Balance — ${emp.fullName}`,
+    bodyHtml: adjustBalanceFormHtml(emp),
+    confirmLabel: "Save Balance",
+    onConfirm: () => {
+      emp.vlBalance = Math.max(0, Number(document.getElementById("ab-vl").value)||0);
+      emp.slBalance = Math.max(0, Number(document.getElementById("ab-sl").value)||0);
+      saveDB(db);
+      toast("Leave balance updated.");
+      closeModal();
+      render();
+    }
+  });
+}
+
+function wireLeaveManagement(){
+  const addBtn = document.getElementById("add-leave-btn");
+  if(!addBtn) return;
+  addBtn.addEventListener("click", openLeaveModal);
+  const filter = document.getElementById("leave-emp-filter");
+  if(filter) filter.addEventListener("change", (e)=>{ state.leaveFilterEmp = e.target.value; render(); });
+  document.querySelectorAll("[data-adjust-bal]").forEach(el=>{
+    el.addEventListener("click", ()=> openAdjustBalanceModal(el.getAttribute("data-adjust-bal")));
+  });
+  document.querySelectorAll("[data-del-leave]").forEach(el=>{
+    el.addEventListener("click", ()=> confirmDeleteLeave(el.getAttribute("data-del-leave")));
+  });
+}
+
+/* ---------------- MY LEAVE (Employee) ---------------- */
+function renderMyLeave(){
+  const emp = findEmployee(state.currentUser.employeeId);
+  const history = employeeLeaveHistory(emp.id);
+  return `
+  <div class="page-head">
+    <div><h2>My Leave</h2><p>Your VL/SL balance and leave history, ${emp.fullName}</p></div>
+  </div>
+  <div class="stat-grid">
+    <div class="ledger-strip">
+      <div class="ledger-stat">
+        <div class="ledger-label">Vacation Leave Balance</div>
+        <div class="ledger-figure">${emp.vlBalance} <span style="font-size:15px;color:var(--ink-soft);">day${emp.vlBalance===1?"":"s"}</span></div>
+      </div>
+      <div class="ledger-stat">
+        <div class="ledger-label">Sick Leave Balance</div>
+        <div class="ledger-figure">${emp.slBalance} <span style="font-size:15px;color:var(--ink-soft);">day${emp.slBalance===1?"":"s"}</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Note</th></tr></thead>
+        <tbody>
+        ${history.length===0 ? `<tr><td colspan="4"><div class="empty-state">No leave logged yet.</div></td></tr>` :
+        history.map(l=>{
+          const badgeClass = l.type==="VL" ? "holiday-badge-regular" : l.type==="SL" ? "holiday-badge-special_working" : "holiday-badge-special_non_working";
+          return `<tr>
+            <td><span class="holiday-badge ${badgeClass}">${leaveTypeLabel(l.type)}</span></td>
+            <td class="tabular">${l.startDate} – ${l.endDate}</td>
+            <td class="tabular">${l.days}</td>
+            <td style="font-size:12px;color:var(--ink-soft);">${l.note||""}</td>
+          </tr>`;
+        }).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+/* ---------------- 13TH MONTH PAY (Admin) ---------------- */
+function renderThirteenthMonth(){
+  const years = availableYearsForThirteenth();
+  const year = state.thirteenthYear || years[0];
+  const s = db.settings;
+
+  const rows = db.employees.map(emp=>{
+    const calc = computeThirteenthMonthPay(emp.id, year, s);
+    const released = releasedThirteenthMonth(emp.id, year);
+    return { emp, calc, released };
+  });
+
+  return `
+  <div class="page-head">
+    <div><h2>13th Month Pay</h2><p>Computed per PD 851 — total Basic Pay earned across the year, divided by 12. Amounts up to the exempt ceiling (set in Payroll Settings) are tax-free; any excess is estimated using the BIR table.</p></div>
+    <select id="th13-year">${years.map(y=>`<option value="${y}" ${y===year?"selected":""}>${y}</option>`).join("")}</select>
+  </div>
+  <div class="panel" style="padding:0;">
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Employee</th><th>Basic Pay Earned (${year})</th><th>13th Month (Gross)</th><th>Taxable Excess</th><th>Withholding Tax</th><th>Net 13th Month Pay</th><th></th>
+        </tr></thead>
+        <tbody>
+        ${rows.map(({emp,calc,released})=>`
+          <tr>
+            <td>${emp.fullName}</td>
+            <td class="tabular">${money(calc.basis)}</td>
+            <td class="tabular">${money(calc.gross)}</td>
+            <td class="tabular">${money(calc.taxableExcess)}</td>
+            <td class="tabular">− ${money(calc.tax)}</td>
+            <td class="tabular"><strong>${money(calc.net)}</strong></td>
+            <td>
+              <div class="row-actions">
+                ${released ? `
+                  <span class="status-pill status-active" style="margin-right:4px;">Released</span>
+                  <button class="btn btn-ghost btn-sm btn-ghost-blue" data-view-pr="${released.id}">View</button>
+                  <button class="btn btn-ghost btn-sm btn-ghost-green" data-print-pr="${released.id}">Print</button>
+                ` : `
+                  <button class="btn btn-ghost btn-sm btn-ghost-plum" data-release-13th="${emp.id}" ${calc.gross<=0?"disabled":""}>Release</button>
+                `}
+              </div>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
+function releaseThirteenthMonth(employeeId){
+  const year = state.thirteenthYear;
+  const emp = findEmployee(employeeId);
+  if(!emp) return;
+  if(releasedThirteenthMonth(employeeId, year)){ toast("Already released for this year.", "error"); return; }
+  const calc = computeThirteenthMonthPay(employeeId, year, db.settings);
+  if(calc.gross <= 0){ toast("No basic pay recorded for this employee in this year.", "error"); return; }
+
+  const zeroContribution = {msc:0, eeRate:0, erRate:0, ee:0, er:0, total:0};
+  const rec = {
+    id: "PR13" + year + employeeId + Math.floor(Math.random()*90+10),
+    employeeId, period: `${year}-13TH`, payFrequency: "13th_month", recordType: "13th_month",
+    dailyRate:0, hourlyRate:0,
+    regularHoursWorked:0, otHours:0, otMultiplier:0, otPay:0,
+    nsdHours:0, nsdRate:0, nsdPay:0,
+    basicSalary: calc.gross, allowances:0, holidayPay:0, bonuses:0, incentives:0, otherEarnings:0,
+    holidayEntries:[], holidayBreakdown:[], regularHolidayPay:0, specialHolidayPay:0, holidayRestDayPremium:0, holidayOvertimePay:0,
+    gross: calc.gross,
+    sss: {...zeroContribution}, philhealth: {base:0,rate:0,eeShare:0,ee:0,er:0,total:0}, pagibig: {base:0,eeRate:0,erRate:0,ee:0,er:0,total:0},
+    withholdingTax: { taxable: calc.taxableExcess, bracket: null, amount: calc.tax },
+    ec: 0,
+    salaryLoan:0, cashAdvance:0, absences:0, tardiness:0, undertime:0, companyLoan:0, otherDeductions:0,
+    unpaidLeaveDays:0, unpaidLeaveDeduction:0, otherDeductTotal:0,
+    overtime:0,
+    deductions: calc.tax,
+    totalDeductions: calc.tax,
+    net: calc.net,
+    thirteenthMonthYear: year,
+    thirteenthMonthBasis: calc.basis
+  };
+  db.payrolls.push(rec);
+  saveDB(db);
+  toast(`13th month pay released for ${emp.fullName}.`);
+  render();
+}
+
+function wireThirteenthMonth(){
+  const yearSel = document.getElementById("th13-year");
+  if(!yearSel) return;
+  yearSel.addEventListener("change", (e)=>{ state.thirteenthYear = Number(e.target.value); render(); });
+  document.querySelectorAll("[data-release-13th]").forEach(el=>{
+    el.addEventListener("click", ()=> releaseThirteenthMonth(el.getAttribute("data-release-13th")));
+  });
+  // data-print-pr / data-view-pr on this page's "Released" rows are already wired
+  // generically in wireShellEvents (shared with the Payroll History page) — binding
+  // them again here would double-fire the click (e.g. two print dialogs).
+}
+
 /* ---------------- PAYROLL: GENERATE ---------------- */
 const PR_FIELD_IDS = ["pr-othours","pr-nsdhours","pr-allow","pr-bonus","pr-incentive","pr-other",
   "pr-loan","pr-advance","pr-absences","pr-tardiness","pr-undertime","pr-comploan","pr-otherded"];
@@ -1516,6 +1988,7 @@ function renderPayrollCreate(){
     </div>
     <h3>Other Deductions</h3>
     <div class="form-grid">
+      <div class="field span-2"><label>Unpaid Leave Deduction <span style="color:var(--ink-faint);">(auto-detected from Leave Management)</span></label><input id="pr-leave" type="text" disabled></div>
       <div class="field"><label>Salary Loan</label><input id="pr-loan" type="number" min="0" step="0.01" value="0"></div>
       <div class="field"><label>Cash Advance</label><input id="pr-advance" type="number" min="0" step="0.01" value="0"></div>
       <div class="field"><label>Absences</label><input id="pr-absences" type="number" min="0" step="0.01" value="0"></div>
@@ -1534,13 +2007,15 @@ function renderPayrollCreate(){
 
 function readPayrollForm(){
   const g = id => Number(document.getElementById(id).value)||0;
+  const empSelect = document.getElementById("pr-employee");
   return {
     regularHoursWorked: g("pr-reghours"), otHours: g("pr-othours"), nsdHours: g("pr-nsdhours"),
     allowances: g("pr-allow"), holidayEntries: state.prHolidayEntries, bonuses: g("pr-bonus"),
     incentives: g("pr-incentive"), otherEarnings: g("pr-other"),
     salaryLoan: g("pr-loan"), cashAdvance: g("pr-advance"), absences: g("pr-absences"),
     tardiness: g("pr-tardiness"), undertime: g("pr-undertime"), companyLoan: g("pr-comploan"),
-    otherDeductions: g("pr-otherded")
+    otherDeductions: g("pr-otherded"),
+    unpaidLeaveDays: empSelect ? unpaidLeaveDaysInPeriod(empSelect.value, getPayrollFormPeriod()) : 0
   };
 }
 
@@ -1598,6 +2073,7 @@ function wirePayrollCreate(){
     document.getElementById("pr-daily").value = money(rec.dailyRate);
     document.getElementById("pr-hourly").value = money(rec.hourlyRate);
     document.getElementById("pr-holiday").value = money(rec.holidayPay);
+    document.getElementById("pr-leave").value = rec.unpaidLeaveDays ? `${rec.unpaidLeaveDays} day(s) — ${money(rec.unpaidLeaveDeduction)}` : "None this period";
     document.getElementById("pr-preview").innerHTML = payrollPreviewHtml(rec);
   }
 
@@ -1657,8 +2133,10 @@ function payrollPreviewHtml(rec){
     <div class="calc-row"><span>PhilHealth (EE ${Math.round(rec.philhealth.eeShare*100)}% of ${Math.round(rec.philhealth.rate*100)}%)</span><span class="tabular">− ${money(rec.philhealth.ee)}</span></div>
     <div class="calc-row"><span>Pag-IBIG (${Math.round(rec.pagibig.eeRate*100)}%)</span><span class="tabular">− ${money(rec.pagibig.ee)}</span></div>
     <div class="calc-row"><span>Withholding Tax</span><span class="tabular">− ${money(rec.withholdingTax.amount)}</span></div>
-    <div class="calc-row"><span>Other Deductions</span><span class="tabular">− ${money(rec.otherDeductTotal)}</span></div>
-    <div class="calc-row total"><span>Net Pay</span><span class="tabular">${money(rec.net)}</span></div>`;
+    ${rec.unpaidLeaveDeduction ? `<div class="calc-row"><span>Unpaid Leave (${rec.unpaidLeaveDays} day${rec.unpaidLeaveDays===1?"":"s"})</span><span class="tabular">− ${money(rec.unpaidLeaveDeduction)}</span></div>` : ""}
+    <div class="calc-row"><span>Other Deductions</span><span class="tabular">− ${money(rec.otherDeductTotal - rec.unpaidLeaveDeduction)}</span></div>
+    <div class="calc-row total"><span>Net Pay</span><span class="tabular">${money(rec.net)}</span></div>
+    <div class="calc-row" style="margin-top:8px;border-top:1px solid var(--border);padding-top:8px;"><span>Employer Contributions (SSS/PhilHealth/Pag-IBIG ER + EC — info only)</span><span class="tabular">${money(round2(rec.sss.er+rec.philhealth.er+rec.pagibig.er+rec.ec))}</span></div>`;
 }
 
 /* ---------------- PAYROLL HISTORY ---------------- */
@@ -1692,10 +2170,12 @@ function renderPayrollHistory(){
         list.map(p=>{
           const emp = findEmployee(p.employeeId) || {fullName:"(deleted employee)"};
           const freq = p.payFrequency || inferFrequencyFromPeriod(p.period);
+          const is13th = p.recordType==="13th_month";
+          const freqLabel = is13th ? "13th Month" : (freq==="biweekly"?"Bi-Weekly":"Monthly");
           return `<tr>
             <td>${emp.fullName}</td>
             <td>${periodLabel(p.period)}</td>
-            <td><span class="status-pill ${freq==="biweekly"?"status-leave":"status-active"}">${freq==="biweekly"?"Bi-Weekly":"Monthly"}</span></td>
+            <td><span class="status-pill ${is13th?"status-inactive":(freq==="biweekly"?"status-leave":"status-active")}">${freqLabel}</span></td>
             <td class="tabular">${money(p.basicSalary)}</td>
             <td class="tabular">${money(p.overtime)}</td>
             <td class="tabular">${money(p.allowances)}</td>
@@ -1706,8 +2186,9 @@ function renderPayrollHistory(){
               <div class="row-actions">
                 <button class="btn btn-ghost btn-sm btn-ghost-blue" data-view-pr="${p.id}">View</button>
                 <button class="btn btn-ghost btn-sm btn-ghost-green" data-print-pr="${p.id}">Download PDF</button>
+                ${is13th ? "" : `
                 <button class="btn btn-ghost btn-sm btn-ghost-amber" data-recalc-pr="${p.id}">Recalculate</button>
-                <button class="btn btn-ghost btn-sm btn-ghost-plum" data-edit-pr="${p.id}">Edit</button>
+                <button class="btn btn-ghost btn-sm btn-ghost-plum" data-edit-pr="${p.id}">Edit</button>`}
                 <button class="btn btn-ghost btn-sm" data-del-pr="${p.id}" style="color:var(--danger);">Delete</button>
               </div>
             </td>
@@ -1719,7 +2200,36 @@ function renderPayrollHistory(){
   </div>`;
 }
 
+function thirteenthMonthSlipHtml(p){
+  const emp = findEmployee(p.employeeId) || {id:p.employeeId, fullName:"(deleted employee)", position:"", department:"", employmentStatus:""};
+  const s = db.settings;
+  const year = p.period.slice(0,4);
+  return `
+  <div class="payslip">
+    <div class="payslip-head" style="flex-direction:column;align-items:flex-start;gap:2px;">
+      <strong style="font-size:15px;">${s.companyName}</strong>
+      <span style="font-size:11.5px;color:var(--ink-soft);">${s.companyAddress}</span>
+    </div>
+    <div class="payslip-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+      <div style="display:flex;justify-content:space-between;width:100%;"><strong>${emp.fullName}</strong><span style="color:var(--ink-soft);">13th Month Pay — ${year}</span></div>
+      <div style="font-size:12px;color:var(--ink-soft);">ID ${emp.id} · ${emp.position||""}${emp.department? " · "+emp.department:""}</div>
+    </div>
+    <div class="payslip-row" style="background:var(--bg);font-weight:600;">COMPUTATION (PD 851)</div>
+    <div class="payslip-row"><span>Total Basic Salary Earned in ${year}</span><span class="tabular">${money(p.thirteenthMonthBasis)}</span></div>
+    <div class="payslip-row"><span>13th Month Pay (Total ÷ 12)</span><span class="tabular">${money(p.gross)}</span></div>
+    <div class="payslip-row net" style="background:var(--accent-soft);"><span>GROSS 13TH MONTH PAY</span><span class="tabular">${money(p.gross)}</span></div>
+    <div class="payslip-row" style="background:var(--bg);font-weight:600;">DEDUCTIONS</div>
+    ${p.withholdingTax.taxable>0 ? `
+    <div class="payslip-row"><span>Tax-Exempt up to</span><span class="tabular">${money(p.withholdingTax.bracket && p.withholdingTax.bracket.exemptCeiling || (s.thirteenthMonth&&s.thirteenthMonth.exemptCeiling)||90000)}</span></div>
+    <div class="payslip-row"><span>Taxable Excess</span><span class="tabular">${money(p.withholdingTax.taxable)}</span></div>
+    <div class="payslip-row"><span>Withholding Tax on Excess (est.)</span><span class="tabular">− ${money(p.withholdingTax.amount)}</span></div>
+    ` : `<div class="payslip-row"><span>Fully tax-exempt — at or below the ₱${((s.thirteenthMonth&&s.thirteenthMonth.exemptCeiling)||90000).toLocaleString()} ceiling</span><span class="tabular">− ₱0.00</span></div>`}
+    <div class="payslip-row net" style="font-size:16px;"><span>NET 13TH MONTH PAY</span><span class="tabular">${money(p.net)}</span></div>
+  </div>`;
+}
+
 function payslipHtml(p){
+  if(p.recordType==="13th_month") return thirteenthMonthSlipHtml(p);
   const emp = findEmployee(p.employeeId) || {id:p.employeeId, fullName:"(deleted employee)", position:"", department:"", employmentStatus:""};
   const s = db.settings;
   const otherEarn = round2(p.allowances+p.holidayPay+p.bonuses+p.incentives+p.otherEarnings);
@@ -1775,6 +2285,7 @@ function payslipHtml(p){
     <div class="payslip-row"><span>Withholding Tax — per BIR table</span><span class="tabular">− ${money(p.withholdingTax.amount)}</span></div>
 
     <div class="payslip-row" style="background:var(--bg);font-weight:600;">OTHER DEDUCTIONS</div>
+    ${p.unpaidLeaveDeduction?`<div class="payslip-row"><span>Unpaid Leave — ${p.unpaidLeaveDays} day${p.unpaidLeaveDays===1?"":"s"}</span><span class="tabular">− ${money(p.unpaidLeaveDeduction)}</span></div>`:""}
     ${p.salaryLoan?`<div class="payslip-row"><span>Salary Loan</span><span class="tabular">− ${money(p.salaryLoan)}</span></div>`:""}
     ${p.cashAdvance?`<div class="payslip-row"><span>Cash Advance</span><span class="tabular">− ${money(p.cashAdvance)}</span></div>`:""}
     ${p.absences?`<div class="payslip-row"><span>Absences</span><span class="tabular">− ${money(p.absences)}</span></div>`:""}
@@ -1785,6 +2296,13 @@ function payslipHtml(p){
     <div class="payslip-row net"><span>TOTAL DEDUCTIONS</span><span class="tabular">− ${money(p.totalDeductions)}</span></div>
 
     <div class="payslip-row net" style="font-size:16px;"><span>NET PAY</span><span class="tabular">${money(p.net)}</span></div>
+
+    <div class="payslip-row" style="background:var(--bg);font-weight:600;">EMPLOYER CONTRIBUTIONS <span style="font-weight:400;font-size:11px;color:var(--ink-soft);">(paid by employer — not deducted from net pay)</span></div>
+    <div class="payslip-row"><span>SSS — Employer Share ${Math.round(p.sss.erRate*100)}% of MSC ${money(p.sss.msc)}</span><span class="tabular">${money(p.sss.er)}</span></div>
+    <div class="payslip-row"><span>PhilHealth — Employer Share</span><span class="tabular">${money(p.philhealth.er)}</span></div>
+    <div class="payslip-row"><span>Pag-IBIG — Employer Share</span><span class="tabular">${money(p.pagibig.er)}</span></div>
+    <div class="payslip-row"><span>SSS Employees' Compensation (EC)</span><span class="tabular">${money(p.ec||0)}</span></div>
+    <div class="payslip-row net"><span>TOTAL EMPLOYER CONTRIBUTIONS</span><span class="tabular">${money(round2(p.sss.er+p.philhealth.er+p.pagibig.er+(p.ec||0)))}</span></div>
   </div>`;
 }
 
@@ -1829,6 +2347,7 @@ function editPayrollFormHtml(p){
     <div class="field"><label>Bonuses</label>${g("ep-bonus", p.bonuses)}</div>
     <div class="field"><label>Incentives</label>${g("ep-incentive", p.incentives)}</div>
     <div class="field"><label>Other Earnings</label>${g("ep-other", p.otherEarnings)}</div>
+    <div class="field span-2"><label>Unpaid Leave Deduction <span style="color:var(--ink-faint);">(auto-detected)</span></label><input id="ep-leave" type="text" disabled value="${money(p.unpaidLeaveDeduction||0)}"></div>
     <div class="field"><label>Salary Loan</label>${g("ep-loan", p.salaryLoan)}</div>
     <div class="field"><label>Cash Advance</label>${g("ep-advance", p.cashAdvance)}</div>
     <div class="field"><label>Absences</label>${g("ep-absences", p.absences)}</div>
@@ -1844,7 +2363,7 @@ function editPayrollFormHtml(p){
 
 const EP_FIELD_IDS = ["ep-reghours","ep-othours","ep-nsdhours","ep-allow","ep-bonus","ep-incentive","ep-other","ep-loan","ep-advance","ep-absences","ep-tardiness","ep-undertime","ep-comploan","ep-otherded"];
 
-function readEditPayrollForm(fallbackHolidayPay){
+function readEditPayrollForm(fallbackHolidayPay, employeeId){
   const g = id => Number(document.getElementById(id).value)||0;
   return {
     regularHoursWorked: g("ep-reghours"), otHours: g("ep-othours"), nsdHours: g("ep-nsdhours"),
@@ -1853,7 +2372,8 @@ function readEditPayrollForm(fallbackHolidayPay){
     incentives: g("ep-incentive"), otherEarnings: g("ep-other"),
     salaryLoan: g("ep-loan"), cashAdvance: g("ep-advance"), absences: g("ep-absences"),
     tardiness: g("ep-tardiness"), undertime: g("ep-undertime"), companyLoan: g("ep-comploan"),
-    otherDeductions: g("ep-otherded")
+    otherDeductions: g("ep-otherded"),
+    unpaidLeaveDays: employeeId ? unpaidLeaveDaysInPeriod(employeeId, getEditFormPeriod()) : 0
   };
 }
 
@@ -1871,6 +2391,7 @@ function getEditFormPeriod(){
 
 function openEditPayroll(id){
   const p = db.payrolls.find(x=>x.id===id);
+  if(p && p.recordType==="13th_month"){ toast("13th month releases can't be edited — delete and release again instead.", "error"); return; }
   const emp = findEmployee(p.employeeId);
   state.editingPayrollId = id;
   // Deep-copy so edits inside the modal don't mutate the saved record until "Save Changes" is confirmed.
@@ -1902,8 +2423,9 @@ function openEditPayroll(id){
     if(!emp) return;
     const period = getEditFormPeriod() || p.period;
     const frequency = getEditFormFrequency();
-    const rec = computePayrollRecord(emp, period, readEditPayrollForm(p.holidayPay), db.settings, frequency);
+    const rec = computePayrollRecord(emp, period, readEditPayrollForm(p.holidayPay, emp.id), db.settings, frequency);
     document.getElementById("ep-holiday").value = money(rec.holidayPay);
+    document.getElementById("ep-leave").value = rec.unpaidLeaveDays ? `${rec.unpaidLeaveDays} day(s) — ${money(rec.unpaidLeaveDeduction)}` : "None this period";
     document.getElementById("ep-preview").innerHTML = payrollPreviewHtml(rec);
   };
   const holidayCtrl = wireHolidayEntriesBlock("ep", state.epHolidayEntries,
@@ -1928,7 +2450,7 @@ function saveEditedPayroll(existing, emp){
   }
   if(!emp){ toast("This employee no longer exists.", "error"); return; }
 
-  const rec = computePayrollRecord(emp, period, readEditPayrollForm(existing.holidayPay), db.settings, frequency);
+  const rec = computePayrollRecord(emp, period, readEditPayrollForm(existing.holidayPay, emp.id), db.settings, frequency);
   rec.id = existing.id;
   const idx = db.payrolls.findIndex(p=>p.id===existing.id);
   db.payrolls[idx] = rec;
@@ -1940,9 +2462,11 @@ function saveEditedPayroll(existing, emp){
 
 function recalculatePayroll(id){
   const p = db.payrolls.find(x=>x.id===id);
+  if(p && p.recordType==="13th_month"){ toast("13th month releases can't be recalculated — delete and release again instead.", "error"); return; }
   const emp = findEmployee(p.employeeId);
   if(!p || !emp){ toast("Cannot recalculate — employee record not found.", "error"); return; }
-  const rec = computePayrollRecord(emp, p.period, p, db.settings, p.payFrequency);
+  const inputs = { ...p, unpaidLeaveDays: unpaidLeaveDaysInPeriod(emp.id, p.period) };
+  const rec = computePayrollRecord(emp, p.period, inputs, db.settings, p.payFrequency);
   rec.id = p.id;
   const idx = db.payrolls.findIndex(x=>x.id===id);
   db.payrolls[idx] = rec;
@@ -2078,6 +2602,20 @@ function renderSettings(){
       <div class="field"><label>Maximum MSC (₱)</label><input id="st-sss-ceiling" type="number" min="0" step="500" value="${s.sss.ceilingComp}"></div>
       <div class="field"><label>MSC Bracket Increment (₱)</label><input id="st-sss-incr" type="number" min="1" step="1" value="${s.sss.increment}"></div>
     </div>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:14px 0 10px 0;">Employees' Compensation (EC) — a small employer-only add-on riding on the same MSC. Never deducted from the employee.</p>
+    <div class="form-grid">
+      <div class="field"><label>EC — MSC Threshold (₱)</label><input id="st-sss-ec-threshold" type="number" min="0" step="500" value="${s.sss.ec.threshold}"></div>
+      <div class="field"><label>EC — Amount at/below Threshold (₱)</label><input id="st-sss-ec-low" type="number" min="0" step="1" value="${s.sss.ec.lowAmount}"></div>
+      <div class="field"><label>EC — Amount above Threshold (₱)</label><input id="st-sss-ec-high" type="number" min="0" step="1" value="${s.sss.ec.highAmount}"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="max-width:760px;">
+    <h3>13th Month Pay</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Computed automatically from each employee's Basic Pay across regular payroll records for the selected year (÷12), on the 13th Month Pay page. Amounts up to the ceiling below are tax-exempt; any excess is taxed as an estimate using the BIR table above.</p>
+    <div class="form-grid">
+      <div class="field"><label>Tax-Exempt Ceiling (₱)</label><input id="st-13th-ceiling" type="number" min="0" step="1000" value="${s.thirteenthMonth.exemptCeiling}"></div>
+    </div>
   </div>
 
   <div class="panel" style="max-width:760px;">
@@ -2103,7 +2641,7 @@ function renderSettings(){
 
   <div class="panel" style="max-width:760px;">
     <h3>Philippine Holiday Pay Rates</h3>
-    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Enter the full statutory day rate (e.g. 200% for a worked regular holiday), the same way DOLE publishes it. Since every employee already receives a flat Basic Salary for the period, a worked Regular Holiday only adds the amount above the 100% already paid; a worked Special Non-Working Day adds the full rate, since "no work, no pay" means nothing for that day was paid in advance. Update these if labor regulations change — holiday pay recalculates automatically, no code changes needed. Manage the holiday calendar itself from the Holidays page.</p>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">DOLE's standard rates: a worked Regular Holiday pays 200% of the daily wage (unworked days are already covered by Basic Salary, so nothing extra is added); a worked Special Non-Working Day pays 130% (unworked days are unpaid — "no work, no pay" — since Basic Salary doesn't cover them). Working a rest day or overtime on top of either adds a further premium. These rates apply automatically to future holiday pay. To add, edit, or remove specific holiday dates, use the Holidays page.</p>
     <div class="form-grid">
       <div class="field"><label>Regular Holiday, Worked (%)</label><input id="st-hol-regworked" type="number" min="100" step="1" value="${Math.round(s.holidayRates.regularWorked*100)}"></div>
       <div class="field"><label>Regular Holiday + Rest Day, Worked (%)</label><input id="st-hol-regrest" type="number" min="100" step="1" value="${Math.round(s.holidayRates.regularRestDayWorked*100)}"></div>
@@ -2118,7 +2656,7 @@ function renderSettings(){
 
   <div class="panel" style="max-width:760px;">
     <h3>BIR Withholding Tax Table (Monthly)</h3>
-    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Edit the bracket boundaries, base tax, and rate for each row. Leave the last row's "Over" field blank for no ceiling.</p>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Set each bracket's income range, base tax, and rate per BIR's table. Leave the last row's "Up To" field blank so it has no ceiling.</p>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Over (₱)</th><th>Up To (₱)</th><th>Base Tax (₱)</th><th>Rate (%)</th></tr></thead>
@@ -2171,6 +2709,10 @@ function wireSettingsForm(){
     s.sss.floorComp = g("st-sss-floor");
     s.sss.ceilingComp = g("st-sss-ceiling");
     s.sss.increment = g("st-sss-incr") || 500;
+    s.sss.ec.threshold = g("st-sss-ec-threshold");
+    s.sss.ec.lowAmount = g("st-sss-ec-low");
+    s.sss.ec.highAmount = g("st-sss-ec-high");
+    s.thirteenthMonth.exemptCeiling = g("st-13th-ceiling");
 
     s.philhealth.rate = g("st-ph-rate")/100;
     s.philhealth.eeShare = g("st-ph-eeshare")/100;
@@ -2363,6 +2905,12 @@ function wireShellEvents(){
   document.querySelectorAll("[data-recalc-pr]").forEach(el=>{
     el.addEventListener("click", ()=> recalculatePayroll(el.getAttribute("data-recalc-pr")));
   });
+
+  // Leave Management page
+  wireLeaveManagement();
+
+  // 13th Month Pay page
+  wireThirteenthMonth();
 
   // Settings page
   wireSettingsForm();
