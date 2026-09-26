@@ -136,6 +136,16 @@
   .table-wrap.swipeable.dragging{cursor:grabbing;}
   .table-wrap.dragging, .table-wrap.dragging *{user-select:none;}
   .row-actions{display:flex;gap:6px;justify-content:flex-end;}
+  /* Row-action colors for Payroll History — reuse the same muted palette already used for
+     holiday badges elsewhere, so these read as an intentional set rather than random color. */
+  .btn-ghost-blue{color:var(--c-blue);}
+  .btn-ghost-blue:hover{background:var(--c-blue-soft);color:var(--c-blue);}
+  .btn-ghost-green{color:var(--c-green);}
+  .btn-ghost-green:hover{background:var(--c-green-soft);color:var(--c-green);}
+  .btn-ghost-amber{color:var(--c-amber);}
+  .btn-ghost-amber:hover{background:var(--c-amber-soft);color:var(--c-amber);}
+  .btn-ghost-plum{color:var(--c-plum);}
+  .btn-ghost-plum:hover{background:var(--c-plum-soft);color:var(--c-plum);}
   .status-pill{font-size:11px;padding:2px 9px;border-radius:10px;font-weight:600;display:inline-block;}
   .status-active{background:var(--accent-soft);color:var(--accent-ink);}
   .status-leave{background:var(--warn-soft);color:var(--warn);}
@@ -362,7 +372,23 @@ function holidaysInPeriod(period){
     .sort((a,b)=> parseISODate(a.date) - parseISODate(b.date));
 }
 
-/* ---------------- HOLIDAY PAY COMPUTATION (DOLE minimum statutory rates) ---------------- */
+/* ---------------- HOLIDAY PAY COMPUTATION (DOLE minimum statutory rates) ----------------
+   IMPORTANT — how this avoids double-paying the base 100%:
+   This system pays every employee a flat per-period "Basic Salary" (monthlySalary/2 for a
+   bi-weekly cutoff) regardless of which specific calendar days fall inside the period. For a
+   REGULAR holiday, that flat basic salary already carries the day's 100% base wage whether or
+   not the holiday is worked (this is why an UNWORKED regular holiday below adds ₱0 — DOLE's
+   100% is already inside "Basic Salary"). So when a regular holiday IS worked, only the
+   INCREMENTAL statutory premium — the amount on top of that already-paid 100% — must be added
+   here, i.e. (multiplier - 1.00), or the employee would effectively be paid the base day twice.
+   A SPECIAL (non-working) day is different: DOLE's "no work, no pay" rule means that day's 100%
+   is NOT assumed pre-paid, so an unworked special day adds ₱0 for a different reason (no legal
+   entitlement), and a WORKED special day correctly adds the FULL statutory multiplier (130%/150%)
+   since nothing for that day was paid in advance.
+   Rates below are the DOLE-minimum total-day percentages (Labor Advisory on regular holidays /
+   special (non-working) days): Regular Holiday worked 200%, +rest day 260% (200%×130%); Special
+   Non-Working worked 130%, +rest day 150%; overtime on any of these = that day's hourly rate ×130%.
+------------------------------------------------------------------------------------------- */
 // entry: {holidayId, hoursWorked, otHours, isRestDay}
 function computeHolidayEntry(entry, holiday, hourlyRate, dailyWorkingHours, rates){
   rates = rates || defaultHolidayRates();
@@ -392,7 +418,11 @@ function computeHolidayEntry(entry, holiday, hourlyRate, dailyWorkingHours, rate
   const otTypeMultiplier = type === "regular" ? rates.regularOtMultiplier : rates.specialOtMultiplier;
   const effMultiplier = isRestDay ? restMultiplier : baseMultiplier;
 
-  const basicAmt = round2(hourlyRate * cappedHours * baseMultiplier);
+  // Regular holiday: subtract the 1.00 (100%) already paid via flat Basic Salary so the day
+  // isn't compensated twice. Special non-working day: nothing was pre-paid, so the full
+  // statutory multiplier applies as-is.
+  const payableBaseMultiplier = type === "regular" ? (baseMultiplier - 1) : baseMultiplier;
+  const basicAmt = round2(hourlyRate * cappedHours * payableBaseMultiplier);
   const restPremiumAmt = isRestDay ? round2(hourlyRate * cappedHours * (restMultiplier - baseMultiplier)) : 0;
   const otAmt = round2(hourlyRate * otHours * effMultiplier * otTypeMultiplier);
   const total = round2(basicAmt + restPremiumAmt + otAmt);
@@ -1015,7 +1045,7 @@ function renderEmployees(){
               <td><span class="status-pill ${statusClass(e.status)}">${e.status}</span></td>
               <td>
                 <div class="row-actions">
-                  <button class="btn btn-ghost btn-sm" data-edit-emp="${e.id}">Edit</button>
+                  <button class="btn btn-ghost btn-sm btn-ghost-plum" data-edit-emp="${e.id}">Edit</button>
                   <button class="btn btn-ghost btn-sm" data-del-emp="${e.id}" style="color:var(--danger);">Delete</button>
                 </div>
               </td>
@@ -1198,8 +1228,8 @@ function renderHolidayManagement(){
             <td style="font-size:12px;color:var(--ink-soft);">${h.source||""}</td>
             <td>
               <div class="row-actions">
-                <button class="btn btn-ghost btn-sm" data-edit-hol="${h.id}">Edit</button>
-                <button class="btn btn-ghost btn-sm" data-toggle-hol="${h.id}">${h.status==="Active"?"Deactivate":"Activate"}</button>
+                <button class="btn btn-ghost btn-sm btn-ghost-plum" data-edit-hol="${h.id}">Edit</button>
+                <button class="btn btn-ghost btn-sm btn-ghost-amber" data-toggle-hol="${h.id}">${h.status==="Active"?"Deactivate":"Activate"}</button>
                 <button class="btn btn-ghost btn-sm" data-del-hol="${h.id}" style="color:var(--danger);">Delete</button>
               </div>
             </td>
@@ -1324,10 +1354,12 @@ function holidayEntryCalcHtml(calc){
   if(calc.note){
     return `<div style="font-size:12px;color:var(--ink-soft);margin-top:8px;">${calc.note}</div>`;
   }
+  const isRegular = h.type === "regular";
+  const baseLabel = isRegular ? "Holiday premium (100% base already in Basic Salary)" : "Base holiday pay";
   return `<div style="font-size:12px;color:var(--ink-soft);margin-top:8px;display:grid;gap:2px;">
-    <div>Applicable rate: ${Math.round(calc.rate*100)}%${calc.isRestDay?" (includes rest-day premium)":""}</div>
-    <div>Base holiday pay: <span class="tabular">${money(calc.basicAmt)}</span>${calc.restPremiumAmt?` · Rest day premium: <span class="tabular">${money(calc.restPremiumAmt)}</span>`:""}${calc.otAmt?` · Holiday OT: <span class="tabular">${money(calc.otAmt)}</span>`:""}</div>
-    <div style="font-weight:600;color:var(--ink);">Entry total: <span class="tabular">${money(calc.total)}</span></div>
+    <div>Statutory day rate: ${Math.round(calc.rate*100)}%${calc.isRestDay?" (includes rest-day premium)":""}${isRegular?" — this entry adds only the amount above the 100% already in Basic Salary":""}</div>
+    <div>${baseLabel}: <span class="tabular">${money(calc.basicAmt)}</span>${calc.restPremiumAmt?` · Rest day premium: <span class="tabular">${money(calc.restPremiumAmt)}</span>`:""}${calc.otAmt?` · Holiday OT: <span class="tabular">${money(calc.otAmt)}</span>`:""}</div>
+    <div style="font-weight:600;color:var(--ink);">Entry total (added to gross): <span class="tabular">${money(calc.total)}</span></div>
   </div>`;
 }
 
@@ -1613,7 +1645,7 @@ function payrollPreviewHtml(rec){
     <div class="calc-row"><span>Overtime Pay (${rec.otHours} hrs × ${Math.round(rec.otMultiplier*100)}%)</span><span class="tabular">${money(rec.otPay)}</span></div>
     <div class="calc-row"><span>Night Differential (${rec.nsdHours} hrs × ${Math.round(rec.nsdRate*100)}%)</span><span class="tabular">${money(rec.nsdPay)}</span></div>
     ${hasHoliday ? `
-    ${rec.regularHolidayPay?`<div class="calc-row"><span>Regular Holiday Pay</span><span class="tabular">${money(rec.regularHolidayPay)}</span></div>`:""}
+    ${rec.regularHolidayPay?`<div class="calc-row"><span>Regular Holiday Premium (added to Basic Salary)</span><span class="tabular">${money(rec.regularHolidayPay)}</span></div>`:""}
     ${rec.specialHolidayPay?`<div class="calc-row"><span>Special Holiday Pay</span><span class="tabular">${money(rec.specialHolidayPay)}</span></div>`:""}
     ${rec.holidayRestDayPremium?`<div class="calc-row"><span>Holiday Rest Day Premium</span><span class="tabular">${money(rec.holidayRestDayPremium)}</span></div>`:""}
     ${rec.holidayOvertimePay?`<div class="calc-row"><span>Holiday Overtime Pay</span><span class="tabular">${money(rec.holidayOvertimePay)}</span></div>`:""}
@@ -1672,10 +1704,10 @@ function renderPayrollHistory(){
             <td class="tabular"><strong>${money(p.net)}</strong></td>
             <td>
               <div class="row-actions">
-                <button class="btn btn-ghost btn-sm" data-view-pr="${p.id}">View</button>
-                <button class="btn btn-ghost btn-sm" data-print-pr="${p.id}">Download PDF</button>
-                <button class="btn btn-ghost btn-sm" data-recalc-pr="${p.id}">Recalculate</button>
-                <button class="btn btn-ghost btn-sm" data-edit-pr="${p.id}">Edit</button>
+                <button class="btn btn-ghost btn-sm btn-ghost-blue" data-view-pr="${p.id}">View</button>
+                <button class="btn btn-ghost btn-sm btn-ghost-green" data-print-pr="${p.id}">Download PDF</button>
+                <button class="btn btn-ghost btn-sm btn-ghost-amber" data-recalc-pr="${p.id}">Recalculate</button>
+                <button class="btn btn-ghost btn-sm btn-ghost-plum" data-edit-pr="${p.id}">Edit</button>
                 <button class="btn btn-ghost btn-sm" data-del-pr="${p.id}" style="color:var(--danger);">Delete</button>
               </div>
             </td>
@@ -1709,7 +1741,7 @@ function payslipHtml(p){
     <div class="payslip-row"><span>Overtime Pay — ${p.otHours} hrs @ ${Math.round(p.otMultiplier*100)}%</span><span class="tabular">${money(p.otPay)}</span></div>
     <div class="payslip-row"><span>Night Differential — ${p.nsdHours} hrs @ ${Math.round(p.nsdRate*100)}%</span><span class="tabular">${money(p.nsdPay)}</span></div>
     ${(p.regularHolidayPay||p.specialHolidayPay||p.holidayRestDayPremium||p.holidayOvertimePay) ? `
-    ${p.regularHolidayPay?`<div class="payslip-row"><span>Regular Holiday Pay</span><span class="tabular">${money(p.regularHolidayPay)}</span></div>`:""}
+    ${p.regularHolidayPay?`<div class="payslip-row"><span>Regular Holiday Premium (added to Basic Salary)</span><span class="tabular">${money(p.regularHolidayPay)}</span></div>`:""}
     ${p.specialHolidayPay?`<div class="payslip-row"><span>Special Holiday Pay</span><span class="tabular">${money(p.specialHolidayPay)}</span></div>`:""}
     ${p.holidayRestDayPremium?`<div class="payslip-row"><span>Holiday Rest Day Premium</span><span class="tabular">${money(p.holidayRestDayPremium)}</span></div>`:""}
     ${p.holidayOvertimePay?`<div class="payslip-row"><span>Holiday Overtime Pay</span><span class="tabular">${money(p.holidayOvertimePay)}</span></div>`:""}
@@ -2003,7 +2035,7 @@ function renderMyPayroll(){
             <td class="tabular">${money(p.deductions)}</td>
             <td class="tabular">${money(p.gross)}</td>
             <td class="tabular"><strong>${money(p.net)}</strong></td>
-            <td><button class="btn btn-ghost btn-sm" data-view-pr="${p.id}">View Payslip</button></td>
+            <td><button class="btn btn-ghost btn-sm btn-ghost-blue" data-view-pr="${p.id}">View Payslip</button></td>
           </tr>`).join("")}
         </tbody>
       </table>
@@ -2071,7 +2103,7 @@ function renderSettings(){
 
   <div class="panel" style="max-width:760px;">
     <h3>Philippine Holiday Pay Rates</h3>
-    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Minimum statutory multipliers per DOLE rules. Update these if labor regulations change — holiday pay recalculates automatically, no code changes needed. Manage the holiday calendar itself from the Holidays page.</p>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:-6px 0 12px 0;">Enter the full statutory day rate (e.g. 200% for a worked regular holiday), the same way DOLE publishes it. Since every employee already receives a flat Basic Salary for the period, a worked Regular Holiday only adds the amount above the 100% already paid; a worked Special Non-Working Day adds the full rate, since "no work, no pay" means nothing for that day was paid in advance. Update these if labor regulations change — holiday pay recalculates automatically, no code changes needed. Manage the holiday calendar itself from the Holidays page.</p>
     <div class="form-grid">
       <div class="field"><label>Regular Holiday, Worked (%)</label><input id="st-hol-regworked" type="number" min="100" step="1" value="${Math.round(s.holidayRates.regularWorked*100)}"></div>
       <div class="field"><label>Regular Holiday + Rest Day, Worked (%)</label><input id="st-hol-regrest" type="number" min="100" step="1" value="${Math.round(s.holidayRates.regularRestDayWorked*100)}"></div>
